@@ -2,962 +2,931 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
-
-use App\Models\HRIS\UnitUsaha;
 use App\Models\HRIS\Bagian;
 use App\Models\HRIS\Karyawan;
-
+use App\Models\HRIS\UnitUsaha;
 use App\Models\TindakAudit\Bidang;
-
-use App\Models\TindakAudit\Temuan;
-use App\Models\TindakAudit\TemuanHistory;
+use App\Models\TindakAudit\Notifikasi;
 use App\Models\TindakAudit\Rekomendasi;
 use App\Models\TindakAudit\RekomendasiHistory;
-use App\Models\TindakAudit\Notifikasi;
-
+use App\Models\TindakAudit\Temuan;
+use App\Models\TindakAudit\TemuanHistory;
+use App\Models\User;
 use App\Services\WhatsAppService;
-
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 class ApiController extends Controller
-{    
-    public function index(Request $request)
+{
+    private const STATUS_DRAFT = 'Draft';
+
+    private const STATUS_TERBUKA = 'Terbuka';
+
+    private const STATUS_PROSES = 'Sedang Diproses';
+
+    private const STATUS_MENUNGGU_VALIDASI = 'Menunggu Validasi';
+
+    private const STATUS_DIVALIDASI = 'Divalidasi';
+
+    private const STATUS_SELESAI = 'Selesai';
+
+    public function index(): string
     {
-        $data="Welcome to API";
-        WhatsAppService::sendMessage(1, $data);
-        return $data;
+        return 'Welcome to API';
     }
 
-    function getBagianCode($name) {
-        $list_bagian = [
-            [
-                "name" => "BAGIAN TANAMAN",
-                "code" => "4TAN"
-            ],
-            [
-                "name" => "BAGIAN TEKNIK & PENGOLAHAN",
-                "code" => "4TEP"
-            ],
-            [
-                "name" => "BAGIAN SEKRETARIAT & HUKUM",
-                "code" => "4SKH"
-            ],
-            [
-                "name" => "BAGIAN SDM & SISTEM MANAJEMEN",
-                "code" => "4SDM"
-            ],
-            [
-                "name" => "BAGIAN KEUANGAN & AKUNTANSI",
-                "code" => "4AKN"
-            ],
-            [
-                "name" => "BAGIAN PENGADAAN & TEKNOLOGI INFORMASI",
-                "code" => "4PTI"
-            ]
-        ];
-    
-        foreach ($list_bagian as $bagian) {
-            if (strcasecmp($bagian['name'], $name) == 0) {
-                return $bagian['code'];
-            }
-        }
-        
-        return null;
-    }
-    
-    // public function createTemuanHistory($action, $temuan_id){
-    //     try{
-    //         $temuan = Temuan::find($temuan_id);
-    //         if($action == "open"){
-    //             $temuan->status = "Terbuka";
-    //         } else if($action == "close"){
-    //             $temuan->status = "Tertutup";
-    //         }
-    //         $temuan->save();
-    //         return response()->json([
-    //            'success' => true,
-    //            'message' => 'Berhasil Membuat History',
-    //             'data' => $temuan
-    //         ], 200);
-    //     }catch (\Exception $e) {}
-    // }
-
-    public function getUnit()
+    public function getUnit(): JsonResponse
     {
         try {
             $data = UnitUsaha::with(['bagian.sub_bagian'])
-            ->where('is_active', true)
-            ->get();
-                return response()->json([
-                'success' => true,
-                'message' => 'Berhasil mengambil data Unit',
-                'data' => $data
-            ], 200);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal mengambil data Unit: '. $e->getMessage(),
-                'data' => null
-            ], 500);
+                ->where('is_active', true)
+                ->get();
+
+            return $this->success('Berhasil mengambil data Unit', $data);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal mengambil data Unit');
         }
     }
-    
-    public function inputTemuan(Request $request){
+
+    public function getBidang(): JsonResponse
+    {
         try {
-            $temuan = Temuan::create([
-                'created_by' => $request->created_by,
-                'kode_unit' => $request->kode_unit,
-                'temuan' => $request->temuan,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'bidang_id' => $request->bidang_id,
-                'kode_bagian' => $request->kode_bagian,
-                'kode_subbagian' => $request->kode_subbagian,
-                'status' => 'Draft',
-            ]);
-            $temuan_history = TemuanHistory::create([
-                'temuan_id' => $temuan->id,
-                'temuan' => $request->temuan,
-                'kode_unit' => $request->kode_unit,
-                'status' => 'Draft',
-                'bidang_id' => $request->bidang_id,
-                'kode_bagian' => $request->kode_bagian,
-                'changed_by' => $request->created_by,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'keterangan' => 'Temuan Baru Dibuat',
-                'action' => 'create',
-            ]);
-            foreach ($request->rekomendasi as $rekom) {
-                $createdRekomendasi = Rekomendasi::create([
-                    'temuan_id' => $temuan->id, 
-                    'rekomendasi' => $rekom,
-                    'status' => 'Menunggu Tindak Lanjut', 
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
+            return $this->success('Berhasil mengambil data Bidang', Bidang::get());
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal mengambil data Bidang');
+        }
+    }
+
+    public function inputTemuan(Request $request): JsonResponse
+    {
+        $this->authorizeSpi();
+
+        $validated = $request->validate([
+            'kode_unit' => ['required', 'string', 'max:50'],
+            'temuan' => ['required', 'string'],
+            'rekomendasi' => ['required', 'array', 'min:1'],
+            'rekomendasi.*' => ['required', 'string'],
+            'bidang_id' => ['required', 'integer'],
+            'kode_bagian' => ['nullable', 'string', 'max:50'],
+            'kode_subbagian' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $temuan = Temuan::create([
+                    'created_by' => $this->currentUserId(),
+                    'kode_unit' => $validated['kode_unit'],
+                    'temuan' => $validated['temuan'],
+                    'bidang_id' => $validated['bidang_id'],
+                    'kode_bagian' => $validated['kode_bagian'] ?? null,
+                    'kode_subbagian' => $validated['kode_subbagian'] ?? null,
+                    'status' => self::STATUS_DRAFT,
                 ]);
-    
-                RekomendasiHistory::create([
-                    'temuan_history_id' => $temuan_history->id, 
-                    'rekomendasi' => $rekom, 
-                    'status' => 'Menunggu Tindak Lanjut', 
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                    'rekomendasi_id' => $createdRekomendasi->id,
-                    'action' => 'create'
-                ]);
-            }
+
+                $temuanHistory = $this->createTemuanHistory(
+                    $temuan,
+                    $this->currentUserId(),
+                    'Temuan Baru Dibuat',
+                    'create',
+                );
+
+                foreach ($validated['rekomendasi'] as $rekomendasi) {
+                    $createdRekomendasi = Rekomendasi::create([
+                        'temuan_id' => $temuan->id,
+                        'rekomendasi' => $rekomendasi,
+                        'status' => 'Menunggu Tindak Lanjut',
+                    ]);
+
+                    $this->createRekomendasiHistory($temuanHistory, $createdRekomendasi, 'create');
+                }
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil Input Temuan',
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Input Temuan: '. $e->getMessage(),
-            ], 500);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Input Temuan');
         }
     }
 
-    public function deleteTemuan(Request $request){
+    public function deleteTemuan(Request $request): JsonResponse
+    {
+        $this->authorizeSpi();
+
+        $validated = $request->validate([
+            'id' => ['required', 'integer'],
+        ]);
+
         try {
-            $temuan = Temuan::with('rekomendasi', 'temuan_history.rekomendasi_history', 'notifikasi')->findOrFail($request->id);
-            foreach ($temuan->temuan_history as $temuan_history) {
-                $temuan_history->rekomendasi_history()->delete();
-            }
-            $temuan->temuan_history()->delete();
-            $temuan->rekomendasi()->delete();
-            $temuan->notifikasi()->delete();
-            $temuan->delete();
+            DB::transaction(function () use ($validated) {
+                $temuan = Temuan::with('rekomendasi', 'temuan_history.rekomendasi_history', 'notifikasi')
+                    ->findOrFail($validated['id']);
+
+                foreach ($temuan->temuan_history as $temuanHistory) {
+                    $temuanHistory->rekomendasi_history()->delete();
+                }
+
+                $temuan->temuan_history()->delete();
+                $temuan->rekomendasi()->delete();
+                $temuan->notifikasi()->delete();
+                $temuan->delete();
+            });
 
             return response()->json([
                 'success' => true,
-                'message' => 'Temuan Berhasil Dihapus'
+                'message' => 'Temuan Berhasil Dihapus',
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-               'success' => false, 
-               'message' => 'Gagal Menghapus Temuan: '. $e->getMessage()
-            ], 500);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Menghapus Temuan');
         }
     }
-    
-    public function deleteRekomendasi(Request $request)
+
+    public function deleteRekomendasi(Request $request): JsonResponse
+    {
+        $this->authorizeSpi();
+
+        $validated = $request->validate([
+            'id' => ['required', 'integer'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $rekomendasi = Rekomendasi::with('rekomendasi_history')->findOrFail($validated['id']);
+
+                foreach ($rekomendasi->rekomendasi_history as $rekomendasiHistory) {
+                    $rekomendasiHistory->delete();
+                }
+
+                $rekomendasi->delete();
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Rekomendasi Berhasil Dihapus',
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Menghapus Rekomendasi');
+        }
+    }
+
+    public function updateTemuan(Request $request): JsonResponse
+    {
+        $this->authorizeSpi();
+
+        $validated = $request->validate([
+            'id' => ['required', 'integer'],
+            'kode_unit' => ['required', 'string', 'max:50'],
+            'temuan' => ['required', 'string'],
+            'bidang_id' => ['required', 'integer'],
+            'kode_bagian' => ['nullable', 'string', 'max:50'],
+            'kode_subbagian' => ['nullable', 'string', 'max:50'],
+            'rekomendasi' => ['required', 'array', 'min:1'],
+            'rekomendasi.*.id' => ['nullable', 'integer'],
+            'rekomendasi.*.rekomendasi' => ['required', 'string'],
+            'rekomendasi.*.status' => ['nullable', 'string'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $temuan = Temuan::findOrFail($validated['id']);
+                $temuan->update([
+                    'temuan' => $validated['temuan'],
+                    'kode_unit' => $validated['kode_unit'],
+                    'bidang_id' => $validated['bidang_id'],
+                    'kode_bagian' => $validated['kode_bagian'] ?? null,
+                    'kode_subbagian' => $validated['kode_subbagian'] ?? null,
+                ]);
+
+                $updatedRekomendasi = [];
+
+                foreach ($validated['rekomendasi'] as $rekom) {
+                    if (! empty($rekom['id'])) {
+                        $rekomendasi = Rekomendasi::where('temuan_id', $temuan->id)
+                            ->findOrFail($rekom['id']);
+
+                        $rekomendasi->update([
+                            'rekomendasi' => $rekom['rekomendasi'],
+                        ]);
+                    } else {
+                        $rekomendasi = Rekomendasi::create([
+                            'temuan_id' => $temuan->id,
+                            'rekomendasi' => $rekom['rekomendasi'],
+                            'status' => $rekom['status'] ?? 'Menunggu Tindak Lanjut',
+                        ]);
+                    }
+
+                    $updatedRekomendasi[] = $rekomendasi;
+                }
+
+                $temuanHistory = $this->createTemuanHistory(
+                    $temuan->fresh(),
+                    $this->currentUserId(),
+                    'Temuan Diperbarui',
+                    'update',
+                );
+
+                foreach ($updatedRekomendasi as $rekomendasi) {
+                    $this->createRekomendasiHistory($temuanHistory, $rekomendasi, 'update');
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Temuan Berhasil Diperbarui',
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Perbarui Temuan');
+        }
+    }
+
+    public function getTemuan(): JsonResponse
     {
         try {
-            $rekomendasi = Rekomendasi::with('rekomendasi_history')->findOrFail($request->id);
+            $query = Temuan::with('rekomendasi', 'unit_usaha', 'bidang', 'bagian', 'sub_bagian');
 
-            foreach ($rekomendasi->rekomendasi_history as $rekomendasiHistory) {
-                $rekomendasiHistory->delete();
+            if (! $this->isSpi()) {
+                $this->scopeTemuanForCurrentUser($query)
+                    ->where('status', '!=', self::STATUS_DRAFT);
             }
 
-            $rekomendasi->delete();
-
-        
-            return response()->json([
-                'success' => true,
-                'message' => 'Rekomendasi Berhasil Dihapus'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Menghapus Rekomendasi: ' . $e->getMessage(),
-            ], 500);
+            return $this->success('Berhasil mengambil data Temuan', $query->get());
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal mengambil data Temuan');
         }
     }
 
-    public function updateTemuan(Request $request){
-        try{
-            $temuan = Temuan::findOrFail($request->id);
-            $temuan->update([
-                'temuan' => $request->temuan,
-                'updated_at' => Carbon::now(),
-                'kode_unit' => $request->kode_unit,
-                'bidang_id' => $request->bidang_id,
-                'kode_bagian' => $request->kode_bagian,
-            ]);
-
-            foreach ($request->rekomendasi as $rekom) {
-                if (isset($rekom['id'])) {
-                    $rekomendasi = Rekomendasi::findOrFail($rekom['id']);
-                    $rekomendasi->update([
-                        'temuan_id' => $temuan->id, 
-                        'rekomendasi' => $rekom['rekomendasi'],
-                        'updated_at' => Carbon::now(),
-                    ]);
-                } else {
-                    Rekomendasi::create([
-                        'temuan_id' => $temuan->id,
-                        'rekomendasi' => $rekom['rekomendasi'],
-                        'status' => $rekom['status'],
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ]);
-                }
-            }
-    
-
-            $temuan_history = TemuanHistory::create([
-                'temuan_id' => $request->id,
-                'temuan' => $request->temuan,
-                'status'=>$temuan->status,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'changed_by' => $request->changed_by,
-                'kode_unit'=> $request->kode_unit,
-                'bidang_id' => $request->bidang_id,
-                'kode_bagian' => $request->kode_bagian,
-                'keterangan' => 'Temuan Diperbarui',
-                'action' => 'update',
-            ]);
-
-            foreach ($request->rekomendasi as $rekom) {
-                if (isset($rekom['id'])) {
-                    $rekomendasi = Rekomendasi::findOrFail($rekom['id']);
-                } else {
-                    $rekomendasi = Rekomendasi::where('temuan_id', $temuan->id)
-                                              ->where('rekomendasi', $rekom['rekomendasi'])
-                                              ->first();
-                }
-                RekomendasiHistory::create([
-                    'temuan_history_id' => $temuan_history->id,
-                    'rekomendasi' => $rekomendasi->rekomendasi,
-                    'status' => $rekomendasi->status,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                    'rekomendasi_id' => $rekomendasi->id,
-                    'action' => 'update'
-                ]);
-            }
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Temuan Berhasil Diperbarui'
-            ]);
-        }catch(\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal Perbarui Temuan' . $e->getMessage()
-             ], 500);
-        }
-    }
-
-    public function getTemuan(Request $request){
+    public function getTemuanValidasi(): JsonResponse
+    {
         try {
-            if($request->is_spi){
-                $data = Temuan::with('rekomendasi','unit_usaha','bidang', 'bagian' ,'sub_bagian')->get();
-            }else{
-                if ($request->kode_unit == '4R00') {
-                    $bagian = $this->getBagianCode($request->bagian);
-                    $data = Temuan::with('rekomendasi', 'unit_usaha', 'bidang', 'bagian', 'sub_bagian')
-                                ->where('kode_bagian', $bagian)
-                                ->where('status', '!=', 'Draft')
-                                ->get();
-                } else {
-                    $data = Temuan::with('rekomendasi', 'unit_usaha', 'bidang', 'bagian', 'sub_bagian')
-                                ->where('kode_unit', $request->kode_unit)
-                                ->where('status', '!=', 'Draft')
-                                ->get();
-                }
+            $query = Temuan::with('rekomendasi', 'unit_usaha', 'bidang', 'bagian', 'sub_bagian')
+                ->whereIn('status', [self::STATUS_MENUNGGU_VALIDASI, self::STATUS_DIVALIDASI]);
+
+            if (! $this->isSpi()) {
+                $this->scopeTemuanForCurrentUser($query);
             }
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil mengambil data Temuan',
-                'data' => $data
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal mengambil data Temuan: '. $e->getMessage(),
-                'data' => null
-            ], 500);
+
+            return $this->success('Berhasil mengambil data Temuan', $query->get());
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal mengambil data Temuan');
         }
     }
 
-    public function getTemuanValidasi(Request $request){
+    public function countUnit(): JsonResponse
+    {
         try {
-            if($request->is_spi){
-                $data = Temuan::with('rekomendasi','unit_usaha','bidang', 'bagian' ,'sub_bagian')->where('status', '=', 'Menunggu Validasi')->orWhere('status', '=', 'Divalidasi')->get();
-            }else{
-                if ($request->kode_unit == '4R00') {
-                    $bagian = $this->getBagianCode($request->bagian);
-                    $data = Temuan::with('rekomendasi', 'unit_usaha', 'bidang', 'bagian', 'sub_bagian')
-                                ->where('kode_bagian', $bagian)
-                                ->where('status', '=', 'Menunggu Validasi')
-                                ->orWhere('status', '=', 'Divalidasi')
-                                ->get();
-                } else {
-                    $data = Temuan::with('rekomendasi', 'unit_usaha', 'bidang', 'bagian', 'sub_bagian')
-                                ->where('kode_unit', $request->kode_unit)
-                                ->where('status', '=', 'Menunggu Validasi')
-                                ->orWhere('status', '=', 'Divalidasi')
-                                ->get();
-                }
-            }
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil mengambil data Temuan',
-                'data' => $data
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal mengambil data Temuan: '. $e->getMessage(),
-                'data' => null
-            ], 500);
-        }
-    }
-    
-    public function countUnit(){
-        try {
-            $unit_usaha = UnitUsaha::where('is_active', true)->count();
+            $unitUsaha = UnitUsaha::where('is_active', true)->count();
             $bagian = Bagian::count();
-            $total = $unit_usaha + $bagian - 1;
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil menghitung data Unit',
-                'data' => $total
-            ], 200);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal menghitung data Unit: '. $e->getMessage(),
-                'data' => null
-            ], 500);
+
+            return $this->success('Berhasil menghitung data Unit', $unitUsaha + $bagian - 1);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal menghitung data Unit');
         }
     }
 
-    public function countTemuan(){
-        try {
-            $data = Temuan::count();
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil menghitung data Temuan',
-                'data' => $data
-            ], 200);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal menghitung data Temuan: '. $e->getMessage(),
-                'data' => null
-            ], 500);
-        }
-    }
-
-    public function countRekomendasi(){
-        try {
-            $data = Rekomendasi::count();
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil menghitung data Rekomendasi',
-                'data' => $data
-            ], 200);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal menghitung data Rekomendasi: '. $e->getMessage(),
-                'data' => null
-            ], 500);
-        }
-    }
-
-    public function countValidasi(){
-        try {
-            $temuan_history = TemuanHistory::where('status', 'Divalidasi')->get();
-            $data = 0;
-            foreach ($temuan_history as $temuan) {
-                $rekomendasi_history = RekomendasiHistory::where('temuan_history_id', $temuan->id)->count();
-                $data += $rekomendasi_history;
-            }
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil menghitung data Validasi',
-                'data' => $data
-            ], 200);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal menghitung data Validasi: '. $e->getMessage(),
-                'data' => null
-            ], 500);
-        }
-    }
-
-    public function getBidang()
+    public function countTemuan(): JsonResponse
     {
         try {
-            $data = Bidang::get();
-                return response()->json([
-                'success' => true,
-                'message' => 'Berhasil mengambil data Bidang',
-                'data' => $data
-            ], 200);
-    
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Gagal mengambil data Bidang: '. $e->getMessage(),
-                'data' => null
-            ], 500);
+            return $this->success('Berhasil menghitung data Temuan', Temuan::count());
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal menghitung data Temuan');
         }
     }
-    public function getTemuanHistory(Request $request)
+
+    public function countRekomendasi(): JsonResponse
     {
         try {
-            $temuanHistory = TemuanHistory::with('rekomendasi_history','bidang','unit_usaha','bagian','karyawan')
-                ->where('temuan_id', $request->temuan_id)
+            return $this->success('Berhasil menghitung data Rekomendasi', Rekomendasi::count());
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal menghitung data Rekomendasi');
+        }
+    }
+
+    public function countValidasi(): JsonResponse
+    {
+        try {
+            $data = RekomendasiHistory::whereHas('temuan_history', function (Builder $query) {
+                $query->where('status', self::STATUS_DIVALIDASI);
+            })->count();
+
+            return $this->success('Berhasil menghitung data Validasi', $data);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal menghitung data Validasi');
+        }
+    }
+
+    public function getTemuanHistory(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'temuan_id' => ['required', 'integer'],
+        ]);
+
+        try {
+            $temuan = Temuan::findOrFail($validated['temuan_id']);
+            $this->ensureCanAccessTemuan($temuan);
+
+            $temuanHistory = TemuanHistory::with('rekomendasi_history', 'bidang', 'unit_usaha', 'bagian', 'karyawan')
+                ->where('temuan_id', $validated['temuan_id'])
+                ->orderBy('created_at')
                 ->get();
-    
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil Mengambil Data Temuan History',
-                'data' => $temuanHistory
-            ], 200);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Mengambil Data Temuan History: ' . $e->getMessage(),
-            ], 500);
+
+            return $this->success('Berhasil Mengambil Data Temuan History', $temuanHistory);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Mengambil Data Temuan History');
         }
     }
-    public function inputTindakLanjut (Request $request){
+
+    public function inputTindakLanjut(Request $request): JsonResponse
+    {
+        abort_if($this->isSpi(), 403, 'Tindak lanjut hanya dapat diinput oleh unit atau bagian.');
+
+        $validated = $request->validate([
+            'rekomendasi' => ['required', 'string'],
+            'bukti' => ['required', 'array', 'min:1'],
+            'bukti.*' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+        ]);
+
+        $rekomendasiArray = json_decode($validated['rekomendasi'], true);
+
+        abort_if(! is_array($rekomendasiArray) || count($rekomendasiArray) === 0, 422, 'Tidak ada rekomendasi yang dikirim.');
+
+        validator($rekomendasiArray, [
+            '*.id' => ['required', 'integer'],
+            '*.temuan_id' => ['required', 'integer'],
+            '*.tindak_lanjut' => ['required', 'string'],
+        ])->validate();
+
+        abort_if(count($request->file('bukti', [])) !== count($rekomendasiArray), 422, 'Jumlah bukti harus sama dengan jumlah rekomendasi.');
+
+        $storedFiles = [];
+
         try {
-            $nik = $request->nik;
-            $rekomendasiArray = json_decode($request->input('rekomendasi'), true);
+            $temuan = null;
 
-            if (count($rekomendasiArray) == 0) {
-                throw new \Exception('Tidak ada rekomendasi yang dikirim.');
-            }
+            DB::transaction(function () use ($request, $rekomendasiArray, &$storedFiles, &$temuan) {
+                $temuanId = $rekomendasiArray[0]['temuan_id'];
+                $temuan = Temuan::findOrFail($temuanId);
+                $this->ensureCanAccessTemuan($temuan);
 
-            $temuanId = $rekomendasiArray[0]['temuan_id'];
+                $latestTemuanHistory = TemuanHistory::where('temuan_id', $temuanId)
+                    ->latest()
+                    ->first();
 
-            $latestTemuanHistory = TemuanHistory::where('temuan_id', $temuanId)
-                ->orderBy('created_at', 'desc')
-                ->first();
+                abort_if(! $latestTemuanHistory, 404, 'History Temuan tidak ditemukan.');
 
-            if (!$latestTemuanHistory) {
-                throw new \Exception('History Temuan tidak ditemukan.');
-            }
+                $newTemuanHistory = $this->createTemuanHistory(
+                    $temuan,
+                    $this->currentUserId(),
+                    'Input Tindak Lanjut',
+                    'tindaklanjut',
+                    self::STATUS_MENUNGGU_VALIDASI,
+                );
 
-            $newTemuanHistory = TemuanHistory::create([
-                'temuan_id' => $temuanId,
-                'temuan' => $latestTemuanHistory->temuan,
-                'kode_unit' => $latestTemuanHistory->kode_unit,
-                'bidang_id' => $latestTemuanHistory->bidang_id,
-                'kode_bagian' => $latestTemuanHistory->kode_bagian,
-                'status' => 'Menunggu Validasi', 
-                'changed_by' => $nik, 
-                'keterangan' => 'Input Tindak Lanjut', 
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'action' => 'tindaklanjut'
-            ]);
-
-            $temuan = Temuan::findOrFail($temuanId);
-            $temuan->update([
-                'status' => 'Menunggu Validasi',
-                'updated_at' => Carbon::now(),
-            ]);
-
-            foreach ($rekomendasiArray as $index=>$rekom) {
-                
-                $rekomendasi = Rekomendasi::findOrFail($rekom['id']);
-                
-                $bukti = $request->file("bukti.$index")->store('public/uploads');
-                
-                $rekomendasi->update([
-                    'tindak_lanjut' => $rekom['tindak_lanjut'],
-                    'status' => 'Menunggu Validasi', 
-                    'updated_at' => Carbon::now(),
-                    'bukti' => $bukti,
+                $temuan->update([
+                    'status' => self::STATUS_MENUNGGU_VALIDASI,
                 ]);
 
-                RekomendasiHistory::create([
-                    'temuan_history_id' => $newTemuanHistory->id,
-                    'rekomendasi' => $rekomendasi->rekomendasi,
-                    'status' => 'Menunggu Validasi', 
-                    'tindak_lanjut' => $rekom['tindak_lanjut'], 
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                    'rekomendasi_id' => $rekomendasi->id, 
-                ]);
-            }
-            
-            $this->createNotifikasi('4R00','4SPI','tindaklanjut',$temuan->id,'Temuan Ditindaklanjut');
+                foreach ($rekomendasiArray as $index => $rekom) {
+                    abort_if((int) $rekom['temuan_id'] !== (int) $temuan->id, 422, 'Rekomendasi tidak berada pada temuan yang sama.');
 
-            if($temuan->kode_unit == '4R00'){
-                $bagian = Bagian::where('code', $temuan->kode_bagian)->first();
-                $bidang = Bidang::where('id', $temuan->bidang_id)->first();
-                $rekomendasi = Rekomendasi::where('temuan_id',$temuan->id)->get();
-                
-                $message = "📢 *[Sistem Tindak Lanjut Audit]*\n\n";
-                $message .= "👋 *Halo, SPI*!\n\n";
-                $message .= "⚠️ *{$bagian->name} telah mengunggah bukti untuk temuan berikut:*\n\n";
-                $message .= "📌 *Judul Temuan*: _{$temuan->temuan}_\n";
-                $message .= "🏢 *Bidang*: _{$bidang->nama}_\n\n";
-                $message .= "📋 *Rekomendasi*:\n";
-                foreach($rekomendasi as $index => $rekom) {
-                    $message .= "   " . ($index + 1) . ". _" . $rekom->rekomendasi . "_\n";
+                    $rekomendasi = Rekomendasi::where('temuan_id', $temuan->id)->findOrFail($rekom['id']);
+                    $bukti = $request->file("bukti.$index")->store('uploads');
+                    $storedFiles[] = $bukti;
+
+                    $rekomendasi->update([
+                        'tindak_lanjut' => $rekom['tindak_lanjut'],
+                        'status' => self::STATUS_MENUNGGU_VALIDASI,
+                        'bukti' => $bukti,
+                    ]);
+
+                    $this->createRekomendasiHistory($newTemuanHistory, $rekomendasi->fresh(), 'tindaklanjut');
                 }
-                $message .= "\n📋 *Tindak Lanjut*:\n";
-                foreach($rekomendasi as $index => $rekom) {
-                    $message .= "   " . ($index + 1) . ". _" . $rekom->tindak_lanjut . "_\n";
-                }
-                $message .= "\n⚡ *Silakan cek bukti tersebut dan lakukan validasi jika sudah sesuai. Terima kasih!* 🙏";
-            }else{
-                $unit = UnitUsaha::where('kode_unit', $temuan->kode_unit)->first();
-                $bidang = Bidang::where('id', $temuan->bidang_id)->first();
-                $rekomendasi = Rekomendasi::where('temuan_id',$temuan->id)->get();
-                
-                $message = "📢 *[Sistem Tindak Lanjut Audit]*\n\n";
-                $message .= "👋 *Halo, SPI*!\n\n";
-                $message .= "⚠️ *Unit {$unit->nama_unit} telah mengunggah bukti untuk temuan berikut:*\n\n";
-                $message .= "📌 *Judul Temuan*: _{$temuan->temuan}_\n";
-                $message .= "🏢 *Bidang*: _{$bidang->nama}_\n\n";
-                $message .= "📋 *Rekomendasi*:\n";
-                foreach($rekomendasi as $index => $rekom) {
-                    $message .= "   " . ($index + 1) . ". _" . $rekom->rekomendasi . "_\n";
-                }
-                $message .= "\n📋 *Tindak Lanjut*:\n";
-                foreach($rekomendasi as $index => $rekom) {
-                    $message .= "   " . ($index + 1) . ". _" . $rekom->tindak_lanjut . "_\n";
-                }
-                $message .= "\n⚡ *Silakan cek bukti tersebut dan lakukan validasi jika sudah sesuai. Terima kasih!* 🙏";
+
+                $this->createNotifikasi('4R00', '4SPI', 'tindaklanjut', $temuan->id, 'Temuan Ditindaklanjut');
+            });
+
+            if ($temuan instanceof Temuan) {
+                $this->sendTindakLanjutNotification($temuan->fresh('rekomendasi', 'bidang', 'unit_usaha', 'bagian'));
             }
-            WhatsAppService::sendMessage(1, $message);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil Input Tindak Lanjut',
-            ], 200);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Input Tindak Lanjut: ' . $e->getMessage(),
-            ], 500);
+            ]);
+        } catch (Throwable $e) {
+            foreach ($storedFiles as $storedFile) {
+                Storage::disk('local')->delete($storedFile);
+            }
+
+            return $this->error($e, 'Gagal Input Tindak Lanjut');
         }
     }
-    
-    function kirimTemuan(Request $request){
-        try{
-            $temuan = Temuan::findOrFail($request->temuan_id);
-            $temuan->update([
-                'status' => 'Terbuka',
-                'updated_at' => Carbon::now(),
-            ]);
 
-            $temuan_history = TemuanHistory::create([
-                'temuan_id' =>  $temuan->id,
-                'temuan' =>  $temuan->temuan,
-                'status'=>$temuan->status,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'changed_by' => $request->changed_by,
-                'kode_unit'=> $temuan->kode_unit,
-                'bidang_id' => $temuan->bidang_id,
-                'kode_bagian' => $temuan->kode_bagian,
-                'keterangan' => 'Temuan Dikirim',
-                'action' => 'send',
-            ]);
+    public function kirimTemuan(Request $request): JsonResponse
+    {
+        $this->authorizeSpi();
 
-            $this->createNotifikasi($temuan->kode_unit,$temuan->kode_bagian,'send',$temuan->id,'Ada Temuan Baru Di Unit Anda');
+        $validated = $request->validate([
+            'temuan_id' => ['required', 'integer'],
+        ]);
 
-            if($temuan->kode_unit == '4R00'){
-                $bagian = Bagian::where('code', $temuan->kode_bagian)->first();
-                $bidang = Bidang::where('id', $temuan->bidang_id)->first();
-                $rekomendasi = Rekomendasi::where('temuan_id',$temuan->id)->get();
-                
-                $message = "📢 *[Sistem Tindak Lanjut Audit]*\n\n";
-                $message .= "👋 *Halo, {$bagian->name}*!\n\n";
-                $message .= "⚠️ *Telah ditemukan temuan audit baru dari SPI*:\n\n";
-                $message .= "📌 *Judul Temuan*: _{$temuan->temuan}_\n";
-                $message .= "🏢 *Bidang*: _{$bidang->nama}_\n\n";
-                $message .= "📋 *Rekomendasi*:\n";
-                foreach($rekomendasi as $index => $rekom) {
-                    $message .= "   " . ($index + 1) . ". _" . $rekom->rekomendasi . "_\n";
-                }
-                $message .= "\n⚡ *Mohon segera berikan tindak lanjut melalui TindakAudit*. Terima kasih! 🙏";
-            }else{
-                $unit = UnitUsaha::where('kode_unit', $temuan->kode_unit)->first();
-                $bidang = Bidang::where('id', $temuan->bidang_id)->first();
-                $rekomendasi = Rekomendasi::where('temuan_id',$temuan->id)->get();
-                
-                $message = "📢 *[Sistem Tindak Lanjut Audit]*\n\n";
-                $message .= "👋 *Halo, {$unit->nama_unit}*!\n\n";
-                $message .= "⚠️ *Telah ditemukan temuan audit baru dari SPI*:\n\n";
-                $message .= "📌 *Judul Temuan*: _{$temuan->temuan}_\n";
-                $message .= "🏢 *Bidang*: _{$bidang->nama}_\n\n";
-                $message .= "📋 *Rekomendasi*:\n";
-                foreach($rekomendasi as $index => $rekom) {
-                    $message .= "   " . ($index + 1) . ". _" . $rekom->rekomendasi . "_\n";
-                }
-                $message .= "\n⚡ *Mohon segera berikan tindak lanjut melalui TindakAudit*. Terima kasih! 🙏";
-            }
-            WhatsAppService::sendMessage(1, $message);
+        try {
+            $temuan = DB::transaction(function () use ($validated) {
+                $temuan = Temuan::findOrFail($validated['temuan_id']);
+                $temuan->update([
+                    'status' => self::STATUS_TERBUKA,
+                ]);
+
+                $this->createTemuanHistory($temuan->fresh(), $this->currentUserId(), 'Temuan Dikirim', 'send');
+                $this->createNotifikasi($temuan->kode_unit, $temuan->kode_bagian, 'send', $temuan->id, 'Ada Temuan Baru Di Unit Anda');
+
+                return $temuan->fresh('rekomendasi', 'bidang', 'unit_usaha', 'bagian');
+            });
+
+            $this->sendTemuanBaruNotification($temuan);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil Mengirim Temuan',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Mengirim Temuan: ' . $e->getMessage(),
-            ], 500);
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Mengirim Temuan');
         }
     }
 
-    function prosesTemuan(Request $request){
-        try{
-            $temuan = Temuan::findOrFail($request->temuan_id);
-            $temuan->update([
-                'status' => 'Sedang Diproses',
-                'updated_at' => Carbon::now(),
-            ]);
+    public function prosesTemuan(Request $request): JsonResponse
+    {
+        abort_if($this->isSpi(), 403, 'Temuan hanya dapat diproses oleh unit atau bagian.');
 
-            $temuan_history = TemuanHistory::create([
-                'temuan_id' =>  $temuan->id,
-                'temuan' =>  $temuan->temuan,
-                'status'=>$temuan->status,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'changed_by' => $request->changed_by,
-                'kode_unit'=> $temuan->kode_unit,
-                'bidang_id' => $temuan->bidang_id,
-                'kode_bagian' => $temuan->kode_bagian,
-                'keterangan' => 'Temuan Diproses',
-                'action' => 'process',
-            ]);
-            $this->createNotifikasi('4R00','4SPI','process',$temuan->id,'Temuan Diproses');
+        $validated = $request->validate([
+            'temuan_id' => ['required', 'integer'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $temuan = Temuan::findOrFail($validated['temuan_id']);
+                $this->ensureCanAccessTemuan($temuan);
+
+                $temuan->update([
+                    'status' => self::STATUS_PROSES,
+                ]);
+
+                $this->createTemuanHistory($temuan->fresh(), $this->currentUserId(), 'Temuan Diproses', 'process');
+                $this->createNotifikasi('4R00', '4SPI', 'process', $temuan->id, 'Temuan Diproses');
+            });
+
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil Proses Temuan',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Proses Temuan: ' . $e->getMessage(),
-            ], 500);
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Proses Temuan');
         }
     }
 
-    function validasiTemuan(Request $request){
-        try{
-            $nik = $request->nik;
-           
-            $rekomendasiArray = $request->rekomendasi;
-            
-            $temuanId = $rekomendasiArray[0]['temuan_id'];
+    public function validasiTemuan(Request $request): JsonResponse
+    {
+        $this->authorizeSpi();
 
-            $temuan = Temuan::findOrFail($temuanId);
-            $temuan->update([
-                'updated_at' => Carbon::now(),
-                'status' => 'Divalidasi',
-            ]);
+        $validated = $request->validate([
+            'rekomendasi' => ['required', 'array', 'min:1'],
+            'rekomendasi.*.id' => ['required', 'integer'],
+            'rekomendasi.*.temuan_id' => ['required', 'integer'],
+            'rekomendasi.*.tindak_lanjut' => ['nullable', 'string'],
+            'rekomendasi.*.status' => [
+                'required',
+                Rule::in(['Sesuai', 'Tidak Sesuai', 'Belum Ditindaklanjut', 'Tidak Dapat Ditindaklanjut']),
+            ],
+            'rekomendasi.*.alasan' => ['required', 'string'],
+        ]);
 
-            $temuan_history = TemuanHistory::create([
-                'temuan_id' => $temuan->id,
-                'temuan' => $temuan->temuan,
-                'status'=>$temuan->status,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'changed_by' => $nik,
-                'kode_unit'=> $temuan->kode_unit,
-                'bidang_id' => $temuan->bidang_id,
-                'kode_bagian' => $temuan->kode_bagian,
-                'keterangan' => 'Temuan Divalidasi',
-                'action' => 'validation',
-            ]);
+        try {
+            $temuan = DB::transaction(function () use ($validated) {
+                $rekomendasiArray = $validated['rekomendasi'];
+                $temuanId = $rekomendasiArray[0]['temuan_id'];
+                $temuan = Temuan::findOrFail($temuanId);
 
-            $this->createNotifikasi($temuan->kode_unit, $temuan->kode_bagian, 'validation', $temuan->id, 'Temuan Divalidasi');
-
-            foreach ($rekomendasiArray as $rekom) {
-                $rekomendasi = Rekomendasi::findOrFail($rekom['id']);
-                $rekomendasi->update([
-                    'status' => $rekom['status'], 
-                    'alasan' => $rekom['alasan'],
-                    'updated_at' => Carbon::now(),
+                $temuan->update([
+                    'status' => self::STATUS_DIVALIDASI,
                 ]);
-                RekomendasiHistory::create([
-                    'temuan_history_id' => $temuan_history->id,
-                    'tindak_lanjut' => $rekom['tindak_lanjut'],
-                    'rekomendasi' => $rekomendasi->rekomendasi,
-                    'status' => $rekom['status'],
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                    'rekomendasi_id' => $rekomendasi->id,
-                    'alasan' => $rekom['alasan'],
-                    'action' => 'validation'
-                ]);
-            }
 
-            if($temuan->kode_unit == '4R00'){
-                $bagian = Bagian::where('code', $temuan->kode_bagian)->first();
-                $bidang = Bidang::where('id', $temuan->bidang_id)->first();
-                $rekomendasi = Rekomendasi::where('temuan_id',$temuan->id)->get();
-                
-                $message = "📢 *[Sistem Tindak Lanjut Audit]*\n\n";
-                $message .= "👋 *Halo, {$bagian->name}*!\n\n";
-                $message .= "⚠️ *Tindak lanjut Anda untuk temuan berikut telah divalidasi oleh SPI*:\n\n";
-                $message .= "📌 *Judul Temuan*: _{$temuan->temuan}_\n";
-                $message .= "🏢 *Bidang*: _{$bidang->nama}_\n\n";
-                $message .= "⚡ *Mohon segera dicek hasil validasi melalui TindakAudit*. Terima kasih! 🙏";
-            }else{
-                $unit = UnitUsaha::where('kode_unit', $temuan->kode_unit)->first();
-                $bidang = Bidang::where('id', $temuan->bidang_id)->first();
-                $rekomendasi = Rekomendasi::where('temuan_id',$temuan->id)->get();
-                
-                $message = "📢 *[Sistem Tindak Lanjut Audit]*\n\n";
-                $message .= "👋 *Halo, {$unit->nama_unit}*!\n\n";
-                $message .= "⚠️ *Tindak lanjut Anda untuk temuan berikut telah divalidasi oleh SPI*:\n\n";
-                $message .= "📌 *Judul Temuan*: _{$temuan->temuan}_\n";
-                $message .= "🏢 *Bidang*: _{$bidang->nama}_\n\n";
-                $message .= "⚡ *Mohon segera dicek hasil validasi melalui TindakAudit*. Terima kasih! 🙏";
-            }
-            WhatsAppService::sendMessage(1, $message);
-            
+                $temuanHistory = $this->createTemuanHistory(
+                    $temuan->fresh(),
+                    $this->currentUserId(),
+                    'Temuan Divalidasi',
+                    'validation',
+                );
+
+                $this->createNotifikasi($temuan->kode_unit, $temuan->kode_bagian, 'validation', $temuan->id, 'Temuan Divalidasi');
+
+                foreach ($rekomendasiArray as $rekom) {
+                    abort_if((int) $rekom['temuan_id'] !== (int) $temuan->id, 422, 'Rekomendasi tidak berada pada temuan yang sama.');
+
+                    $rekomendasi = Rekomendasi::where('temuan_id', $temuan->id)->findOrFail($rekom['id']);
+                    $rekomendasi->update([
+                        'status' => $rekom['status'],
+                        'alasan' => $rekom['alasan'],
+                    ]);
+
+                    $this->createRekomendasiHistory($temuanHistory, $rekomendasi->fresh(), 'validation');
+                }
+
+                return $temuan->fresh('rekomendasi', 'bidang', 'unit_usaha', 'bagian');
+            });
+
+            $this->sendValidasiNotification($temuan);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil Validasi Temuan',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Validasi Temuan: ' . $e->getMessage(),
-            ], 500);
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Validasi Temuan');
         }
     }
 
-    function unitCekValidasi(Request $request){
-        try{
-           
-            $rekomendasiArray = $request->rekomendasi;
-            $valid = false;
-            foreach ($rekomendasiArray as $rekom) {
-                $rekomendasi = Rekomendasi::findOrFail($rekom['id']);
-                if($rekomendasi->status!= 'Sesuai'){
-                    $valid = false;
-                    break;
-                }else{
-                    $valid=true;
-                }
-            }
+    public function unitCekValidasi(Request $request): JsonResponse
+    {
+        abort_if($this->isSpi(), 403, 'Konfirmasi validasi hanya dapat dilakukan oleh unit atau bagian.');
 
-            $nik = $request->changed_by;
-            $temuan = Temuan::findOrFail($request->temuan_id);
-            
-            if($valid){
+        $validated = $request->validate([
+            'temuan_id' => ['required', 'integer'],
+            'rekomendasi' => ['required', 'array', 'min:1'],
+            'rekomendasi.*.id' => ['required', 'integer'],
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $temuan = Temuan::findOrFail($validated['temuan_id']);
+                $this->ensureCanAccessTemuan($temuan);
+
+                $allRekomendasiSesuai = collect($validated['rekomendasi'])->every(function (array $rekom) use ($temuan) {
+                    return Rekomendasi::where('temuan_id', $temuan->id)
+                        ->where('id', $rekom['id'])
+                        ->where('status', 'Sesuai')
+                        ->exists();
+                });
+
                 $temuan->update([
-                    'updated_at' => Carbon::now(),
-                    'status' => 'Selesai',
+                    'status' => $allRekomendasiSesuai ? self::STATUS_SELESAI : self::STATUS_TERBUKA,
                 ]);
-                $temuan_history = TemuanHistory::create([
-                    'temuan_id' => $temuan->id,
-                    'temuan' => $temuan->temuan,
-                    'status'=> $temuan->status,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                    'changed_by' => $nik,
-                    'kode_unit'=> $temuan->kode_unit,
-                    'bidang_id' => $temuan->bidang_id,
-                    'kode_bagian' => $temuan->kode_bagian,
-                    'keterangan' => 'Audit Selesai',
-                    'action' => 'checked',
-                ]);
-            }else{
-                $temuan->update([
-                    'updated_at' => Carbon::now(),
-                    'status' => 'Terbuka',
-                ]);
-                $temuan_history = TemuanHistory::create([
-                    'temuan_id' => $temuan->id,
-                    'temuan' => $temuan->temuan,
-                    'status'=> $temuan->status,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                    'changed_by' => $nik,
-                    'kode_unit'=> $temuan->kode_unit,
-                    'bidang_id' => $temuan->bidang_id,
-                    'kode_bagian' => $temuan->kode_bagian,
-                    'keterangan' => 'Tindak Lanjut Belum Sesuai',
-                    'action' => 'checked',
-                ]);
-            }
+
+                $this->createTemuanHistory(
+                    $temuan->fresh(),
+                    $this->currentUserId(),
+                    $allRekomendasiSesuai ? 'Audit Selesai' : 'Tindak Lanjut Belum Sesuai',
+                    'checked',
+                );
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil Konfirmasi Hasil Validasi',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Konfirmasi Hasil Validasi ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    function createNotifikasi($kode_unit, $kode_bagian, $action, $temuan_id, $message){
-        try{
-
-            $notifikasi = Notifikasi::create([
-                'temuan_id' => $temuan_id,
-                'kode_unit' => $kode_unit,
-                'kode_bagian' => $kode_bagian,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-                'action' => $action,
-                'message' => $message,
-                'read' => false,
             ]);
-
-            return response()->json([
-               'success' => true,
-               'message' => 'Berhasil Membuat Notifikasi',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-               'success' => false,
-               'message' => 'Gagal Membuat Notifikasi '. $e->getMessage(),
-            ], 500);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Konfirmasi Hasil Validasi');
         }
     }
-    
-    function getNotifikasi(Request $request){
-        try{
-            $nik = $request->nik;
 
-            if($request->is_spi){
-                $notifikasi = Notifikasi::with('temuan')->where('kode_bagian', '4SPI')->orderBy('created_at', 'desc')->get();
-            }else{
-                $karyawan = Karyawan::where('nik' ,$nik)->first();
+    public function getNotifikasi(): JsonResponse
+    {
+        try {
+            $notifikasi = $this->notificationQueryForCurrentUser()
+                ->with('temuan')
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-                if($karyawan->kode_unit=='4R00'){
-                    $bagian = $this->getBagianCode($karyawan->sub_unit);    
-                    $notifikasi = Notifikasi::with('temuan')->where('kode_bagian', $bagian)->orderBy('created_at', 'desc')->get();
-                }else{
-                    $notifikasi = Notifikasi::with('temuan')->where('kode_unit', $karyawan->kode_unit)->orderBy('created_at', 'desc')->get();
-                }
-            }
-            
-            $data= $notifikasi;
             return response()->json([
+                'success' => true,
+                'message' => 'Berhasil Mengambil Notifikasi',
+                'data' => $notifikasi,
+                'notification_count' => $notifikasi->where('read', false)->count(),
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Mengambil Notifikasi');
+        }
+    }
+
+    public function readNotifikasi(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'notifikasi_id' => ['required', 'integer'],
+        ]);
+
+        try {
+            $notifikasi = Notifikasi::findOrFail($validated['notifikasi_id']);
+            $this->ensureCanAccessNotifikasi($notifikasi);
+
+            $notifikasi->update(['read' => true]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Berhasil Membaca Notifikasi',
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Membaca Notifikasi');
+        }
+    }
+
+    public function readAllNotifikasi(): JsonResponse
+    {
+        try {
+            $this->notificationQueryForCurrentUser()
+                ->where('read', false)
+                ->update([
+                    'read' => true,
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Berhasil Membaca Notifikasi',
+            ]);
+        } catch (Throwable $e) {
+            return $this->error($e, 'Gagal Membaca Notifikasi');
+        }
+    }
+
+    public function downloadBukti(Rekomendasi $rekomendasi)
+    {
+        $this->ensureCanAccessTemuan($rekomendasi->temuan()->firstOrFail());
+
+        abort_if(empty($rekomendasi->bukti), 404, 'Bukti tidak ditemukan.');
+
+        $disk = 'local';
+        $path = $rekomendasi->bukti;
+
+        if (str_starts_with($path, 'public/')) {
+            $disk = 'public';
+            $path = substr($path, strlen('public/'));
+        }
+
+        abort_unless(Storage::disk($disk)->exists($path), 404, 'Bukti tidak ditemukan.');
+
+        return Storage::disk($disk)->download($path);
+    }
+
+    private function getBagianCode(?string $name): ?string
+    {
+        if (empty($name)) {
+            return null;
+        }
+
+        $bagian = Bagian::where('code', $name)
+            ->orWhereRaw('LOWER(name) = ?', [strtolower($name)])
+            ->first();
+
+        if ($bagian) {
+            return $bagian->code;
+        }
+
+        $listBagian = [
+            'BAGIAN TANAMAN' => '4TAN',
+            'BAGIAN TEKNIK & PENGOLAHAN' => '4TEP',
+            'BAGIAN SEKRETARIAT & HUKUM' => '4SKH',
+            'BAGIAN SDM & SISTEM MANAJEMEN' => '4SDM',
+            'BAGIAN KEUANGAN & AKUNTANSI' => '4AKN',
+            'BAGIAN PENGADAAN & TEKNOLOGI INFORMASI' => '4PTI',
+            'SATUAN PENGAWAS INTERN' => '4SPI',
+        ];
+
+        return $listBagian[strtoupper($name)] ?? null;
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+
+        abort_if(! $user instanceof User, 401, 'Unauthenticated.');
+
+        return $user;
+    }
+
+    private function currentNik(): string
+    {
+        return (string) $this->currentUser()->nik;
+    }
+
+    private function currentUserId(): int
+    {
+        return (int) $this->currentUser()->id;
+    }
+
+    private function currentKaryawan(): Karyawan
+    {
+        $karyawan = Karyawan::where('nik', $this->currentNik())->first();
+
+        abort_if(! $karyawan, 403, 'Profil karyawan tidak ditemukan.');
+
+        return $karyawan;
+    }
+
+    private function isSpi(): bool
+    {
+        return $this->currentUser()->isSpi();
+    }
+
+    private function authorizeSpi(): void
+    {
+        abort_unless($this->isSpi(), 403, 'Aksi ini hanya dapat dilakukan oleh SPI.');
+    }
+
+    private function scopeTemuanForCurrentUser(Builder $query): Builder
+    {
+        $karyawan = $this->currentKaryawan();
+
+        if ($karyawan->kode_unit === '4R00') {
+            $kodeBagian = $this->getBagianCode($karyawan->sub_unit);
+            abort_if(empty($kodeBagian), 403, 'Kode bagian pengguna tidak dikenali.');
+
+            return $query->where('kode_unit', '4R00')
+                ->where('kode_bagian', $kodeBagian);
+        }
+
+        return $query->where('kode_unit', $karyawan->kode_unit);
+    }
+
+    private function ensureCanAccessTemuan(Temuan $temuan): void
+    {
+        if ($this->isSpi()) {
+            return;
+        }
+
+        $karyawan = $this->currentKaryawan();
+
+        if ($karyawan->kode_unit === '4R00') {
+            $kodeBagian = $this->getBagianCode($karyawan->sub_unit);
+            abort_unless($temuan->kode_unit === '4R00' && $temuan->kode_bagian === $kodeBagian, 403, 'Anda tidak dapat mengakses temuan ini.');
+
+            return;
+        }
+
+        abort_unless($temuan->kode_unit === $karyawan->kode_unit, 403, 'Anda tidak dapat mengakses temuan ini.');
+    }
+
+    private function ensureCanAccessNotifikasi(Notifikasi $notifikasi): void
+    {
+        if ($this->isSpi()) {
+            abort_unless($notifikasi->kode_bagian === '4SPI', 403, 'Anda tidak dapat mengakses notifikasi ini.');
+
+            return;
+        }
+
+        $karyawan = $this->currentKaryawan();
+
+        if ($karyawan->kode_unit === '4R00') {
+            abort_unless($notifikasi->kode_bagian === $this->getBagianCode($karyawan->sub_unit), 403, 'Anda tidak dapat mengakses notifikasi ini.');
+
+            return;
+        }
+
+        abort_unless($notifikasi->kode_unit === $karyawan->kode_unit, 403, 'Anda tidak dapat mengakses notifikasi ini.');
+    }
+
+    private function notificationQueryForCurrentUser(): Builder
+    {
+        $query = Notifikasi::query();
+
+        if ($this->isSpi()) {
+            return $query->where('kode_bagian', '4SPI');
+        }
+
+        $karyawan = $this->currentKaryawan();
+
+        if ($karyawan->kode_unit === '4R00') {
+            return $query->where('kode_bagian', $this->getBagianCode($karyawan->sub_unit));
+        }
+
+        return $query->where('kode_unit', $karyawan->kode_unit);
+    }
+
+    private function createTemuanHistory(Temuan $temuan, int $changedBy, string $keterangan, string $action, ?string $status = null): TemuanHistory
+    {
+        return TemuanHistory::create([
+            'temuan_id' => $temuan->id,
+            'temuan' => $temuan->temuan,
+            'kode_unit' => $temuan->kode_unit,
+            'bidang_id' => $temuan->bidang_id,
+            'kode_bagian' => $temuan->kode_bagian,
+            'status' => $status ?? $temuan->status,
+            'changed_by' => $changedBy,
+            'keterangan' => $keterangan,
+            'action' => $action,
+        ]);
+    }
+
+    private function createRekomendasiHistory(TemuanHistory $temuanHistory, Rekomendasi $rekomendasi, string $action): RekomendasiHistory
+    {
+        return RekomendasiHistory::create([
+            'temuan_history_id' => $temuanHistory->id,
+            'rekomendasi_id' => $rekomendasi->id,
+            'rekomendasi' => $rekomendasi->rekomendasi,
+            'status' => $rekomendasi->status,
+            'alasan' => $rekomendasi->alasan,
+            'tindak_lanjut' => $rekomendasi->tindak_lanjut,
+            'action' => $action,
+        ]);
+    }
+
+    private function createNotifikasi(?string $kodeUnit, ?string $kodeBagian, string $action, int $temuanId, string $message): Notifikasi
+    {
+        return Notifikasi::create([
+            'temuan_id' => $temuanId,
+            'kode_unit' => $kodeUnit ?? '4R00',
+            'kode_bagian' => $kodeBagian,
+            'action' => $action,
+            'message' => $message,
+            'read' => false,
+        ]);
+    }
+
+    private function sendTemuanBaruNotification(Temuan $temuan): void
+    {
+        $recipient = $this->temuanRecipientName($temuan);
+        $bidang = $temuan->bidang?->nama ?? '-';
+        $message = "[Sistem Tindak Lanjut Audit]\n\n";
+        $message .= "Halo, {$recipient}!\n\n";
+        $message .= "Telah ditemukan temuan audit baru dari SPI:\n\n";
+        $message .= "Judul Temuan: {$temuan->temuan}\n";
+        $message .= "Bidang: {$bidang}\n\n";
+        $message .= "Rekomendasi:\n";
+
+        foreach ($temuan->rekomendasi as $index => $rekomendasi) {
+            $message .= ($index + 1).". {$rekomendasi->rekomendasi}\n";
+        }
+
+        $message .= "\nMohon segera berikan tindak lanjut melalui TindakAudit. Terima kasih.";
+
+        WhatsAppService::sendMessage(config('services.wablas.debug_phone'), $message);
+    }
+
+    private function sendTindakLanjutNotification(Temuan $temuan): void
+    {
+        $recipient = $this->temuanRecipientName($temuan);
+        $bidang = $temuan->bidang?->nama ?? '-';
+        $message = "[Sistem Tindak Lanjut Audit]\n\n";
+        $message .= "Halo, SPI!\n\n";
+        $message .= "{$recipient} telah mengunggah bukti untuk temuan berikut:\n\n";
+        $message .= "Judul Temuan: {$temuan->temuan}\n";
+        $message .= "Bidang: {$bidang}\n\n";
+        $message .= "Tindak Lanjut:\n";
+
+        foreach ($temuan->rekomendasi as $index => $rekomendasi) {
+            $message .= ($index + 1).". {$rekomendasi->tindak_lanjut}\n";
+        }
+
+        $message .= "\nSilakan cek bukti tersebut dan lakukan validasi jika sudah sesuai.";
+
+        WhatsAppService::sendMessage(config('services.wablas.debug_phone'), $message);
+    }
+
+    private function sendValidasiNotification(Temuan $temuan): void
+    {
+        $recipient = $this->temuanRecipientName($temuan);
+        $bidang = $temuan->bidang?->nama ?? '-';
+        $message = "[Sistem Tindak Lanjut Audit]\n\n";
+        $message .= "Halo, {$recipient}!\n\n";
+        $message .= "Tindak lanjut Anda untuk temuan berikut telah divalidasi oleh SPI:\n\n";
+        $message .= "Judul Temuan: {$temuan->temuan}\n";
+        $message .= "Bidang: {$bidang}\n\n";
+        $message .= 'Mohon segera dicek hasil validasi melalui TindakAudit. Terima kasih.';
+
+        WhatsAppService::sendMessage(config('services.wablas.debug_phone'), $message);
+    }
+
+    private function temuanRecipientName(Temuan $temuan): string
+    {
+        if ($temuan->kode_unit === '4R00') {
+            return $temuan->bagian?->name ?? 'Bagian';
+        }
+
+        return $temuan->unit_usaha?->nama_unit ?? 'Unit';
+    }
+
+    private function success(string $message, mixed $data): JsonResponse
+    {
+        return response()->json([
             'success' => true,
-            'message' => 'Berhasil Mengambil Notifikasi',
+            'message' => $message,
             'data' => $data,
-            'notification_count' => $notifikasi->where('read', false)->count(),
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Mengambil Notifikasi ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-    
-    function readNotifikasi(Request $request){
-        try{
-            $notifikasi_id = $request->notifikasi_id;
-
-            $notifikasi = Notifikasi::find($notifikasi_id);
-            $notifikasi->update(['read'=>  true, 'updated_at' => Carbon::now()]);
-
-            return response()->json([
-            'success' => true,
-            'message' => 'Berhasil Membaca Notifikasi',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Membaca Notifikasi ' . $e->getMessage(),
-            ], 500);
-        }
+        ]);
     }
 
-    function readAllNotifikasi(Request $request){
-        try{
-            $is_spi = $request->is_spi;
-            if($is_spi){
-                $notifikasi = Notifikasi::where('kode_bagian', '4SPI')->where('read','false')->get();
-                foreach ($notifikasi as $notif) {
-                    $notif->update(['read'=>  true, 'updated_at' => Carbon::now()]);
-                }
-            }else{
-                $kode_unit = $request->kode_unit;
-                $kode_bagian = $this->getBagianCode($request->kode_bagian);
+    private function error(Throwable $e, string $message): JsonResponse
+    {
+        $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
 
-                if($kode_unit=='4R00'){
-                    $notifikasi = Notifikasi::where('kode_bagian', $kode_bagian)->where('read','false')->get();
-                    foreach ($notifikasi as $notif) {
-                        $notif->update(['read'=>  true, 'updated_at' => Carbon::now()]);
-                    }
-                }else{
-                    $notifikasi = Notifikasi::where('kode_unit', $kode_unit)->where('read','false')->get();
-                    foreach ($notifikasi as $notif) {
-                        $notif->update(['read'=>  true, 'updated_at' => Carbon::now()]);
-                    }
-                }
-            }
-            
-
-            return response()->json([
-            'success' => true,
-            'message' => 'Berhasil Membaca Notifikasi',
-            ], 200);
-        }catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Membaca Notifikasi ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => $message.': '.$e->getMessage(),
+            'data' => null,
+        ], $status);
     }
 }

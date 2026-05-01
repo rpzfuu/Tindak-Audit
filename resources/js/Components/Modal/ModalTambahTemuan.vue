@@ -7,7 +7,7 @@ import InputUnitUsaha from "../Input/InputUnitUsaha.vue";
 import InputBagian from "../Input/InputBagian.vue";
 import InputBidang from "../Input/InputBidang.vue";
 
-const props = defineProps<{
+defineProps<{
     user: any;
 }>();
 
@@ -29,7 +29,6 @@ defineExpose({
 });
 
 const form = ref({
-    created_by: props.user.nik,
     kode_unit: "",
     temuan: "",
     rekomendasi: [""],
@@ -100,7 +99,6 @@ const unit = ref<{
         kode_grup_unit: any;
         is_saturday_on: any;
         is_head_office: any;
-        nilai1_cur: any;
         created_at: any;
         updated_at: any;
         is_active: any;
@@ -132,7 +130,6 @@ const unit = ref<{
             kode_grup_unit: "",
             is_saturday_on: "",
             is_head_office: "",
-            nilai1_cur: "",
             created_at: "",
             updated_at: "",
             is_active: "",

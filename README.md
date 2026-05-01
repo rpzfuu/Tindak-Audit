@@ -1,66 +1,151 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# TindakAudit
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+TindakAudit adalah web app untuk monitoring tindak lanjut audit internal. Workflow utamanya adalah SPI membuat temuan dan rekomendasi, unit atau bagian mengunggah bukti tindak lanjut, lalu SPI melakukan validasi sampai temuan selesai.
 
-## About Laravel
+Project ini awalnya dibuat sebagai project kuliah/magang, lalu dipoles ulang untuk portfolio dengan fokus pada reproducible setup, security dasar, audit trail, validasi input, dan dokumentasi.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Laravel 11
+- PHP 8.2
+- PostgreSQL
+- Vue 3, TypeScript, Inertia.js
+- Tailwind CSS, DaisyUI
+- Laravel Sanctum
+- Wablas WhatsApp gateway, dengan mode `log`/`disabled` untuk demo
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Fitur
 
-## Learning Laravel
+- Login berbasis NIK.
+- Role SPI dan non-SPI berdasarkan tabel `tindakaudit.spi`.
+- Input temuan audit, rekomendasi, dan status draft.
+- Kirim temuan ke unit usaha atau bagian kantor direksi.
+- Upload bukti tindak lanjut dengan validasi PDF/JPG/PNG maksimal 5MB.
+- Validasi tindak lanjut oleh SPI.
+- Audit trail temuan dan rekomendasi pada setiap transisi status.
+- Notifikasi in-app dengan counter unread.
+- Integrasi WhatsApp yang bisa dimatikan atau diarahkan ke log untuk demo.
+- Seeder demo untuk login dan mencoba workflow.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Prasyarat
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- PHP 8.2
+- Composer 2
+- Node.js 20+
+- PostgreSQL 14+
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Composer dikunci dengan `config.platform.php = 8.2.0` agar lock file tetap stabil untuk environment Laravel 11. Jika memakai PHP yang lebih baru, beberapa dependency lama mungkin memberi peringatan deprecation, tetapi target runtime yang disarankan tetap PHP 8.2.
 
-## Laravel Sponsors
+## Instalasi
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+composer install
+npm install --legacy-peer-deps
+cp .env.example .env
+php artisan key:generate
+```
 
-### Premium Partners
+Buat database PostgreSQL, lalu sesuaikan variabel berikut di `.env`:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=TindakAudit
+DB_USERNAME=postgres
+DB_PASSWORD=your_password
+DB_SEARCH_PATH=tindakaudit,hris,public
+DB_MIGRATIONS_TABLE=public.migrations
+```
 
-## Contributing
+Jalankan migration dan seeder:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan migrate --seed
+npm run build
+php artisan serve
+```
 
-## Code of Conduct
+## Akun Demo
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Semua akun demo memakai password:
 
-## Security Vulnerabilities
+```text
+password
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Role | NIK | Keterangan |
+| --- | --- | --- |
+| SPI | `19990001` | Input temuan, kirim temuan, validasi bukti |
+| SPI Reviewer | `19990002` | Akun SPI kedua untuk validasi/demo |
+| Unit Usaha | `19990003` | Proses temuan dan input tindak lanjut unit |
+| Bagian Kantor Direksi | `19990005` | Proses temuan dan input tindak lanjut bagian Tanaman |
+| Bagian Kantor Direksi | `19990007` | Proses temuan dan input tindak lanjut bagian SDM |
 
-## License
+## Environment WhatsApp
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Default demo tidak mengirim pesan sungguhan.
+
+```env
+WABLAS_DRIVER=log
+WABLAS_SERVER=https://pati.wablas.com
+WABLAS_TOKEN=
+WABLAS_DEBUG_PHONE=
+```
+
+Nilai `WABLAS_DRIVER`:
+
+- `log`: pesan dicatat di log Laravel, cocok untuk demo.
+- `disabled`: integrasi dimatikan total.
+- `wablas`: kirim ke Wablas memakai `WABLAS_TOKEN`.
+
+Jika token Wablas pernah masuk git history, token lama harus di-rotate dari dashboard Wablas. Menghapus token dari source tidak membuat token lama kembali aman.
+
+## Struktur Penting
+
+- `app/Http/Controllers/ApiController.php`: endpoint workflow audit dan notifikasi.
+- `app/Models/TindakAudit`: model domain audit.
+- `app/Models/HRIS`: model mock HRIS lokal untuk demo mandiri.
+- `database/migrations`: schema `hris` dan `tindakaudit`.
+- `database/seeders/DatabaseSeeder.php`: data demo portfolio.
+- `resources/js/Pages` dan `resources/js/Components`: UI Inertia/Vue.
+- `docs/retrospective.md`: catatan polishing dan keputusan teknis.
+
+## Catatan Security
+
+Perbaikan portfolio yang sudah diterapkan:
+
+- Token dan nomor debug WhatsApp dipindahkan ke env/config.
+- Identitas user tidak lagi dipercaya dari request body untuk aksi penting.
+- Schema `users` diselaraskan dengan SQL asli: login NIK-only tanpa kolom `name`/`email`.
+- Kolom audit `created_by` dan `changed_by` memakai `users.id`, bukan NIK dari client.
+- Endpoint mutasi SPI dibatasi ke user yang terdaftar di `tindakaudit.spi`.
+- Akses temuan/notifikasi dibatasi berdasarkan role, unit, atau bagian user.
+- Operasi multi-tabel utama memakai `DB::transaction`.
+- Upload bukti divalidasi dan disimpan di storage private, diakses melalui route auth.
+- Dependency PHP diaudit dan diperbarui sampai `composer audit` bersih.
+- Runtime npm production audit bersih via `npm audit --omit=dev`.
+
+## Known Limitations
+
+- Controller API masih besar. Refactor berikutnya yang masuk akal adalah memecahnya menjadi controller domain tanpa mengubah kontrak frontend.
+- Query API masih mempertahankan beberapa route POST untuk read agar frontend lama tetap kompatibel.
+- Test suite membutuhkan PostgreSQL dengan schema `hris` dan `tindakaudit`; `php artisan migrate --seed` dan `php artisan test` belum bisa diverifikasi di mesin tanpa kredensial DB lokal.
+- Environment ini memakai PHP 8.5, sehingga beberapa dependency Laravel/Pest menampilkan deprecation warning. Target runtime project tetap PHP 8.2 sesuai `composer.json`.
+- `npm audit` penuh masih menyisakan low/moderate advisory pada dev tooling lama (`vite/esbuild`) dan type package `vue-select`. Runtime production audit (`npm audit --omit=dev`) sudah bersih.
+- Screenshot belum disertakan di repo ini. Ambil screenshot setelah `php artisan migrate --seed` berhasil: Dashboard, Temuan, Validasi, Profile.
+
+## Verification
+
+Perintah yang dipakai saat polishing:
+
+```bash
+composer audit
+composer validate --strict
+vendor/bin/pint --dirty
+npm audit --omit=dev
+npm run build
+php artisan route:list
+```
+
+`php artisan migrate --seed` dan `php artisan test` belum dijalankan sampai selesai di mesin ini karena PostgreSQL lokal meminta password untuk user `postgres`.

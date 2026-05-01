@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'wablas' => [
+        'driver' => env('WABLAS_DRIVER', 'log'),
+        'server' => env('WABLAS_SERVER', 'https://pati.wablas.com'),
+        'token' => env('WABLAS_TOKEN'),
+        'debug_phone' => env('WABLAS_DEBUG_PHONE'),
+    ],
+
 ];

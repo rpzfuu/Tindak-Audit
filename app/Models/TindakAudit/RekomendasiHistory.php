@@ -19,10 +19,12 @@ class RekomendasiHistory extends Model
         'created_at',
         'updated_at',
         'rekomendasi_id',
-        'tindak_lanjut'
+        'tindak_lanjut',
+        'action',
     ];
 
-    public function temuan_history(){
+    public function temuan_history()
+    {
         return $this->belongsTo(TemuanHistory::class, 'temuan_history_id', 'id');
     }
 }

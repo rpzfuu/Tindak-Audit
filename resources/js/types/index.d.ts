@@ -1,9 +1,8 @@
 export interface User {
     id: number;
-    name: string;
     nik: string;
-    email: string;
-    email_verified_at?: string;
+    is_reset_password: boolean;
+    reset_password_at?: string | null;
     karyawan: {
         nama: string;
         suskel: string;
@@ -14,8 +13,13 @@ export interface User {
         esubgrup: string;
         jabatan: string;
         jenkel: string;
+        pendidikan: string;
         tanggal_masuk: string;
+        tanggal_cuti_tahunan: string | null;
+        tanggal_cuti_panjang: string | null;
         tanggal_lahir: string;
+        bod: string;
+        no_hp: string | null;
         unit_usaha: {
             nama_unit: string;
             kode_unit: any;

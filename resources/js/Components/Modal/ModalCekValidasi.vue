@@ -101,7 +101,6 @@ const unitCekValidasi = async () => {
     try {
         const form = ref({
             temuan_id: props.temuan.id,
-            changed_by: props.nik,
             rekomendasi: props.temuan.rekomendasi,
         });
         const res = await RequestAPI.unitCekValidasi({ data: form.value });

@@ -84,7 +84,6 @@ const kirimTemuan = async () => {
     try {
         const form = ref({
             temuan_id: props.temuan.id,
-            changed_by: props.nik,
         });
         const res = await RequestAPI.kirimTemuan({ data: form.value });
         Toast.showSuccess(res.message);

@@ -2,22 +2,21 @@
 
 namespace App\Models\TindakAudit;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use App\Models\HRIS\UnitUsaha;
 use App\Models\HRIS\Bagian;
 use App\Models\HRIS\SubBagian;
+use App\Models\HRIS\UnitUsaha;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Temuan extends Model
 {
     use HasFactory;
 
     protected $table = 'tindakaudit.temuan';
-    
+
     protected $fillable = [
         'created_by',
         'temuan',
-        'rekomendasi',
         'kode_unit',
         'created_at',
         'updated_at',
@@ -26,12 +25,14 @@ class Temuan extends Model
         'kode_subbagian',
         'status',
     ];
+
     public function unit_usaha()
     {
         return $this->hasOne(UnitUsaha::class, 'kode_unit', 'kode_unit');
     }
 
-    public function bidang(){
+    public function bidang()
+    {
         return $this->hasOne(Bidang::class, 'id', 'bidang_id');
     }
 
@@ -45,15 +46,18 @@ class Temuan extends Model
         return $this->hasOne(SubBagian::class, 'code', 'kode_subbagian');
     }
 
-    public function temuan_history(){
+    public function temuan_history()
+    {
         return $this->hasMany(TemuanHistory::class, 'temuan_id', 'id');
     }
 
-    public function rekomendasi(){
+    public function rekomendasi()
+    {
         return $this->hasMany(Rekomendasi::class, 'temuan_id', 'id');
     }
 
-    public function notifikasi(){
+    public function notifikasi()
+    {
         return $this->hasMany(Notifikasi::class, 'temuan_id', 'id');
     }
 }

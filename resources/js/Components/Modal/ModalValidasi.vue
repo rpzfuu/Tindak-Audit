@@ -88,19 +88,18 @@ const validasiTemuan = async () => {
 
                     <div class="mb-4">
                         <a
-                            :href="`http://127.0.0.1:8000/storage/${rekomendasi.bukti.replace(
-                                'public/',
-                                ''
-                            )}`"
+                            v-if="rekomendasi.bukti_url"
+                            :href="rekomendasi.bukti_url"
                             type="application/pdf"
-                            width="100%"
-                            height="600px"
                             target="_blank"
                             class="btn"
                             ><v-icon
                                 name="fa-file-pdf"
                                 class="text-error"
                             />Bukti {{ index + 1 }}</a
+                        >
+                        <span v-else class="text-sm text-gray-500"
+                            >Bukti belum tersedia</span
                         >
                     </div>
 

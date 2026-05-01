@@ -59,13 +59,15 @@ const handleFileInputChange = (index: number) => {
     }
 
     const file = filesInput[0];
-    if (file.size > 10000000) {
-        Toast.showError("File size exceeds the maximum limit of 10MB.");
+    if (file.size > 5 * 1024 * 1024) {
+        Toast.showError("Ukuran file maksimal 5MB.");
         return;
     }
 
-    if (!["application/pdf"].includes(file.type)) {
-        Toast.showError("Only PDF files are allowed.");
+    if (
+        !["application/pdf", "image/jpeg", "image/png"].includes(file.type)
+    ) {
+        Toast.showError("File harus berupa PDF, JPG, atau PNG.");
         return;
     }
 
@@ -122,7 +124,7 @@ const handleFileInputChange = (index: number) => {
                             type="file"
                             @change="handleFileInputChange(index)"
                             class="w-full file-input file-input-bordered"
-                            accept=".pdf"
+                            accept=".pdf,.jpg,.jpeg,.png"
                         />
                     </div>
                 </div>

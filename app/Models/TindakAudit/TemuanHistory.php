@@ -2,18 +2,19 @@
 
 namespace App\Models\TindakAudit;
 
+use App\Models\HRIS\Bagian;
 use App\Models\HRIS\Karyawan;
 use App\Models\HRIS\UnitUsaha;
-use App\Models\HRIS\Bagian;
-
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class TemuanHistory extends Model
 {
     use HasFactory;
+
     protected $table = 'tindakaudit.temuan_history';
-    
+
     protected $fillable = [
         'temuan_id',
         'temuan',
@@ -25,26 +26,31 @@ class TemuanHistory extends Model
         'status',
         'changed_by',
         'keterangan',
-        'action'
+        'action',
     ];
 
-    public function temuan(){
+    public function temuan()
+    {
         return $this->hasOne(Temuan::class, 'id', 'temuan_id');
     }
 
-    public function rekomendasi_history(){
+    public function rekomendasi_history()
+    {
         return $this->hasMany(RekomendasiHistory::class, 'temuan_history_id', 'id');
     }
 
-    public function bidang(){
+    public function bidang()
+    {
         return $this->hasOne(Bidang::class, 'id', 'bidang_id');
     }
-    
-    public function karyawan(){
-        return $this->hasOne(Karyawan::class, 'nik', 'changed_by');
+
+    public function karyawan()
+    {
+        return $this->hasOneThrough(Karyawan::class, User::class, 'id', 'nik', 'changed_by', 'nik');
     }
 
-    public function unit_usaha(){
+    public function unit_usaha()
+    {
         return $this->hasOne(UnitUsaha::class, 'kode_unit', 'kode_unit');
     }
 

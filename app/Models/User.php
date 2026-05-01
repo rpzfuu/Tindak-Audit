@@ -1,18 +1,18 @@
 <?php
 
 namespace App\Models;
+
 use App\Models\HRIS\Karyawan;
 use App\Models\TindakAudit\Spi;
-use Laravel\Sanctum\HasApiTokens;
-
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -20,11 +20,10 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
         'nik',
-        'email',
         'password',
-        'is_reset_password'
+        'is_reset_password',
+        'reset_password_at',
     ];
 
     /**
@@ -45,10 +44,12 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
+            'is_reset_password' => 'boolean',
+            'reset_password_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
+
     public function karyawan()
     {
         return $this->hasOne(Karyawan::class, 'nik', 'nik');
@@ -61,6 +62,6 @@ class User extends Authenticatable
 
     public function isSpi()
     {
-        return $this->spi()->exists(); 
+        return $this->spi()->exists();
     }
 }

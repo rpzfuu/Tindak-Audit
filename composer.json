@@ -1,8 +1,8 @@
 {
-    "name": "laravel/laravel",
+    "name": "portfolio/tindakaudit",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Sistem tindak lanjut audit internal berbasis Laravel, Inertia, Vue, dan PostgreSQL.",
+    "keywords": ["audit", "laravel", "inertia", "vue", "postgresql"],
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -64,6 +64,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.2.0"
         }
     },
     "minimum-stability": "stable",

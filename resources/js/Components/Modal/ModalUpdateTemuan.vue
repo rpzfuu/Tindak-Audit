@@ -42,7 +42,6 @@ defineExpose({
 });
 
 const form = ref({
-    changed_by: props.nik,
     id: "",
     kode_unit: "",
     temuan: "",
@@ -111,7 +110,6 @@ const unit = ref<{
         kode_grup_unit: any;
         is_saturday_on: any;
         is_head_office: any;
-        nilai1_cur: any;
         created_at: any;
         updated_at: any;
         is_active: any;
@@ -143,7 +141,6 @@ const unit = ref<{
             kode_grup_unit: "",
             is_saturday_on: "",
             is_head_office: "",
-            nilai1_cur: "",
             created_at: "",
             updated_at: "",
             is_active: "",
