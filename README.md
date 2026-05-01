@@ -54,7 +54,7 @@ DB_PORT=5432
 DB_DATABASE=TindakAudit
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
-DB_SEARCH_PATH=tindakaudit,hris,public
+DB_SEARCH_PATH=public,hris,tindakaudit
 DB_MIGRATIONS_TABLE=public.migrations
 ```
 
@@ -130,7 +130,7 @@ Perbaikan portfolio yang sudah diterapkan:
 
 - Controller API masih besar. Refactor berikutnya yang masuk akal adalah memecahnya menjadi controller domain tanpa mengubah kontrak frontend.
 - Query API masih mempertahankan beberapa route POST untuk read agar frontend lama tetap kompatibel.
-- Test suite membutuhkan PostgreSQL dengan schema `hris` dan `tindakaudit`; `php artisan migrate --seed` dan `php artisan test` belum bisa diverifikasi di mesin tanpa kredensial DB lokal.
+- Test suite membutuhkan PostgreSQL dengan schema `hris` dan `tindakaudit`.
 - Environment ini memakai PHP 8.5, sehingga beberapa dependency Laravel/Pest menampilkan deprecation warning. Target runtime project tetap PHP 8.2 sesuai `composer.json`.
 - `npm audit` penuh masih menyisakan low/moderate advisory pada dev tooling lama (`vite/esbuild`) dan type package `vue-select`. Runtime production audit (`npm audit --omit=dev`) sudah bersih.
 - Screenshot belum disertakan di repo ini. Ambil screenshot setelah `php artisan migrate --seed` berhasil: Dashboard, Temuan, Validasi, Profile.
@@ -148,4 +148,4 @@ npm run build
 php artisan route:list
 ```
 
-`php artisan migrate --seed` dan `php artisan test` belum dijalankan sampai selesai di mesin ini karena PostgreSQL lokal meminta password untuk user `postgres`.
+`php artisan migrate:fresh --seed` dan `php artisan test` sudah diverifikasi di PostgreSQL lokal.

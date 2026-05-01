@@ -32,6 +32,7 @@ Versi awal sudah menunjukkan konsep yang kuat, tetapi belum siap menjadi portfol
 - Menambahkan route download bukti yang tetap melewati auth dan scope akses.
 - Mengupdate dependency PHP sampai `composer audit` bersih.
 - Mengganti README dengan dokumentasi project, instalasi, akun demo, env vars, dan limitation.
+- Token Wablas lama pernah masuk git history dan harus dianggap compromised; rotate token di dashboard Wablas sebelum repository dibuka publik.
 
 ## Yang Sengaja Dipertahankan
 
