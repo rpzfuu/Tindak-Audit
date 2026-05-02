@@ -9,11 +9,12 @@ class UnitUsaha extends Model
 {
     use HasFactory;
 
+    protected $connection = 'superapps';
+
     protected $table = 'hris.unit_usaha';
 
     public function bagian()
     {
         return $this->hasMany(Bagian::class, 'kode_unit', 'kode_unit');
     }
-
 }

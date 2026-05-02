@@ -1,8 +1,6 @@
 export interface User {
     id: number;
     nik: string;
-    is_reset_password: boolean;
-    reset_password_at?: string | null;
     karyawan: {
         nama: string;
         suskel: string;

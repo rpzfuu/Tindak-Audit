@@ -9,9 +9,11 @@ class Bidang extends Model
 {
     use HasFactory;
 
+    protected $connection = 'pgsql';
+
     protected $table = 'tindakaudit.bidang';
 
     protected $fillable = [
-       'nama'
+        'nama',
     ];
 }

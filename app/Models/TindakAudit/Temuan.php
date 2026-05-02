@@ -12,6 +12,8 @@ class Temuan extends Model
 {
     use HasFactory;
 
+    protected $connection = 'pgsql';
+
     protected $table = 'tindakaudit.temuan';
 
     protected $fillable = [

@@ -10,6 +10,8 @@ class Spi extends Model
 {
     use HasFactory;
 
+    protected $connection = 'pgsql';
+
     protected $table = 'tindakaudit.spi';
 
     public $timestamps = false;

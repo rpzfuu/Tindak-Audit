@@ -2,6 +2,10 @@
 
 use App\Models\User;
 
+beforeEach(function () {
+    $this->seed();
+});
+
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
 
@@ -9,7 +13,7 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+    $user = User::where('nik', '19990001')->firstOrFail();
 
     $response = $this->post('/login', [
         'nik' => $user->nik,
@@ -21,7 +25,7 @@ test('users can authenticate using the login screen', function () {
 });
 
 test('users can not authenticate with invalid password', function () {
-    $user = User::factory()->create();
+    $user = User::where('nik', '19990001')->firstOrFail();
 
     $this->post('/login', [
         'nik' => $user->nik,
@@ -32,7 +36,7 @@ test('users can not authenticate with invalid password', function () {
 });
 
 test('users can logout', function () {
-    $user = User::factory()->create();
+    $user = User::where('nik', '19990001')->firstOrFail();
 
     $response = $this->actingAs($user)->post('/logout');
 

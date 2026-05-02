@@ -46,7 +46,6 @@ class ApiController extends Controller
     {
         try {
             $data = UnitUsaha::with(['bagian.sub_bagian'])
-                ->where('is_active', true)
                 ->get();
 
             return $this->success('Berhasil mengambil data Unit', $data);
@@ -81,7 +80,7 @@ class ApiController extends Controller
         try {
             DB::transaction(function () use ($validated) {
                 $temuan = Temuan::create([
-                    'created_by' => $this->currentUserId(),
+                    'created_by' => $this->currentNik(),
                     'kode_unit' => $validated['kode_unit'],
                     'temuan' => $validated['temuan'],
                     'bidang_id' => $validated['bidang_id'],
@@ -92,7 +91,7 @@ class ApiController extends Controller
 
                 $temuanHistory = $this->createTemuanHistory(
                     $temuan,
-                    $this->currentUserId(),
+                    $this->currentNik(),
                     'Temuan Baru Dibuat',
                     'create',
                 );
@@ -228,7 +227,7 @@ class ApiController extends Controller
 
                 $temuanHistory = $this->createTemuanHistory(
                     $temuan->fresh(),
-                    $this->currentUserId(),
+                    $this->currentNik(),
                     'Temuan Diperbarui',
                     'update',
                 );
@@ -282,7 +281,7 @@ class ApiController extends Controller
     public function countUnit(): JsonResponse
     {
         try {
-            $unitUsaha = UnitUsaha::where('is_active', true)->count();
+            $unitUsaha = UnitUsaha::count();
             $bagian = Bagian::count();
 
             return $this->success('Berhasil menghitung data Unit', $unitUsaha + $bagian - 1);
@@ -383,7 +382,7 @@ class ApiController extends Controller
 
                 $newTemuanHistory = $this->createTemuanHistory(
                     $temuan,
-                    $this->currentUserId(),
+                    $this->currentNik(),
                     'Input Tindak Lanjut',
                     'tindaklanjut',
                     self::STATUS_MENUNGGU_VALIDASI,
@@ -444,7 +443,7 @@ class ApiController extends Controller
                     'status' => self::STATUS_TERBUKA,
                 ]);
 
-                $this->createTemuanHistory($temuan->fresh(), $this->currentUserId(), 'Temuan Dikirim', 'send');
+                $this->createTemuanHistory($temuan->fresh(), $this->currentNik(), 'Temuan Dikirim', 'send');
                 $this->createNotifikasi($temuan->kode_unit, $temuan->kode_bagian, 'send', $temuan->id, 'Ada Temuan Baru Di Unit Anda');
 
                 return $temuan->fresh('rekomendasi', 'bidang', 'unit_usaha', 'bagian');
@@ -478,7 +477,7 @@ class ApiController extends Controller
                     'status' => self::STATUS_PROSES,
                 ]);
 
-                $this->createTemuanHistory($temuan->fresh(), $this->currentUserId(), 'Temuan Diproses', 'process');
+                $this->createTemuanHistory($temuan->fresh(), $this->currentNik(), 'Temuan Diproses', 'process');
                 $this->createNotifikasi('4R00', '4SPI', 'process', $temuan->id, 'Temuan Diproses');
             });
 
@@ -519,7 +518,7 @@ class ApiController extends Controller
 
                 $temuanHistory = $this->createTemuanHistory(
                     $temuan->fresh(),
-                    $this->currentUserId(),
+                    $this->currentNik(),
                     'Temuan Divalidasi',
                     'validation',
                 );
@@ -580,7 +579,7 @@ class ApiController extends Controller
 
                 $this->createTemuanHistory(
                     $temuan->fresh(),
-                    $this->currentUserId(),
+                    $this->currentNik(),
                     $allRekomendasiSesuai ? 'Audit Selesai' : 'Tindak Lanjut Belum Sesuai',
                     'checked',
                 );
@@ -714,11 +713,6 @@ class ApiController extends Controller
         return (string) $this->currentUser()->nik;
     }
 
-    private function currentUserId(): int
-    {
-        return (int) $this->currentUser()->id;
-    }
-
     private function currentKaryawan(): Karyawan
     {
         $karyawan = Karyawan::where('nik', $this->currentNik())->first();
@@ -807,7 +801,7 @@ class ApiController extends Controller
         return $query->where('kode_unit', $karyawan->kode_unit);
     }
 
-    private function createTemuanHistory(Temuan $temuan, int $changedBy, string $keterangan, string $action, ?string $status = null): TemuanHistory
+    private function createTemuanHistory(Temuan $temuan, string $changedBy, string $keterangan, string $action, ?string $status = null): TemuanHistory
     {
         return TemuanHistory::create([
             'temuan_id' => $temuan->id,

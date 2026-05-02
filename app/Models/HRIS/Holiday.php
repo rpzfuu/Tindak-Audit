@@ -9,5 +9,7 @@ class Holiday extends Model
 {
     use HasFactory;
 
+    protected $connection = 'superapps';
+
     protected $table = 'hris.holiday';
 }

@@ -9,6 +9,8 @@ class RekomendasiHistory extends Model
 {
     use HasFactory;
 
+    protected $connection = 'pgsql';
+
     protected $table = 'tindakaudit.rekomendasi_history';
 
     protected $fillable = [

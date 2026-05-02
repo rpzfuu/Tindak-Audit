@@ -46,10 +46,13 @@
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
+        "post-install-cmd": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php -r \"if (! preg_match('/^APP_KEY=.+/m', file_get_contents('.env'))) passthru(escapeshellarg(PHP_BINARY).' artisan key:generate --ansi --no-interaction');\""
+        ],
         "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php -r \"if (! preg_match('/^APP_KEY=.+/m', file_get_contents('.env'))) passthru(escapeshellarg(PHP_BINARY).' artisan key:generate --ansi --no-interaction');\""
         ]
     },
     "extra": {

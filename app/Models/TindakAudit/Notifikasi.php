@@ -11,6 +11,8 @@ class Notifikasi extends Model
 {
     use HasFactory;
 
+    protected $connection = 'pgsql';
+
     protected $table = 'tindakaudit.notifikasi';
 
     protected $fillable = [

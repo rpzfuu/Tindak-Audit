@@ -94,7 +94,21 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_SEARCH_PATH', 'public,hris,tindakaudit'),
+            'search_path' => env('DB_SEARCH_PATH', 'public,tindakaudit'),
+            'sslmode' => 'prefer',
+        ],
+
+        'superapps' => [
+            'driver' => 'pgsql',
+            'host' => env('SUPERAPPS_DB_HOST', '127.0.0.1'),
+            'port' => env('SUPERAPPS_DB_PORT', '5432'),
+            'database' => env('SUPERAPPS_DB_DATABASE', 'superapps_dev'),
+            'username' => env('SUPERAPPS_DB_USERNAME', env('DB_USERNAME')),
+            'password' => env('SUPERAPPS_DB_PASSWORD', env('DB_PASSWORD')),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => env('SUPERAPPS_DB_SEARCH_PATH', 'public,hris'),
             'sslmode' => 'prefer',
         ],
 

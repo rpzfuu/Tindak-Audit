@@ -9,84 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('CREATE SCHEMA IF NOT EXISTS hris');
         DB::statement('CREATE SCHEMA IF NOT EXISTS tindakaudit');
-
-        Schema::create('hris.unit_usaha', function (Blueprint $table) {
-            $table->id();
-            $table->string('kode_unit', 10)->unique();
-            $table->string('nama_unit', 50);
-            $table->string('kode_grup_unit', 50)->nullable();
-            $table->string('nama_grup_unit', 50)->nullable();
-            $table->boolean('is_saturday_on')->default(false);
-            $table->boolean('is_head_office')->default(false);
-            $table->timestamps();
-            $table->boolean('is_active')->default(true)->index();
-        });
-
-        Schema::create('hris.bagian', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('code')->unique();
-            $table->timestamps();
-            $table->string('kode_unit', 10)->nullable()->index();
-
-            $table->foreign('kode_unit')
-                ->references('kode_unit')
-                ->on('hris.unit_usaha')
-                ->cascadeOnUpdate()
-                ->nullOnDelete();
-        });
-
-        Schema::create('hris.sub_bagian', function (Blueprint $table) {
-            $table->id();
-            $table->string('bagian_code')->index();
-            $table->string('name');
-            $table->string('code')->unique();
-            $table->timestamps();
-
-            $table->foreign('bagian_code')
-                ->references('code')
-                ->on('hris.bagian')
-                ->cascadeOnUpdate()
-                ->cascadeOnDelete();
-        });
-
-        Schema::create('hris.karyawan', function (Blueprint $table) {
-            $table->id();
-            $table->string('nik', 15)->unique();
-            $table->string('nama', 50);
-            $table->string('suskel', 10)->nullable();
-            $table->string('ptkp', 10)->nullable();
-            $table->string('kode_unit', 10)->index();
-            $table->string('sub_unit', 50)->nullable();
-            $table->string('egrup', 50)->nullable();
-            $table->string('esubgrup', 50)->nullable();
-            $table->string('jabatan', 100)->nullable();
-            $table->string('jenkel', 20)->nullable();
-            $table->string('pendidikan', 50)->nullable();
-            $table->date('tanggal_masuk')->nullable();
-            $table->date('tanggal_cuti_tahunan')->nullable();
-            $table->date('tanggal_cuti_panjang')->nullable();
-            $table->date('tanggal_lahir')->nullable();
-            $table->string('bod', 10)->nullable();
-            $table->timestamps();
-            $table->string('no_hp')->nullable();
-
-            $table->foreign('kode_unit')
-                ->references('kode_unit')
-                ->on('hris.unit_usaha')
-                ->cascadeOnUpdate()
-                ->restrictOnDelete();
-        });
-
-        Schema::create('hris.holiday', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->date('date')->unique();
-            $table->string('type');
-            $table->timestamps();
-        });
 
         Schema::create('tindakaudit.bidang', function (Blueprint $table) {
             $table->increments('id');
@@ -97,17 +20,11 @@ return new class extends Migration
         Schema::create('tindakaudit.spi', function (Blueprint $table) {
             $table->increments('id');
             $table->string('nik', 15)->unique();
-
-            $table->foreign('nik')
-                ->references('nik')
-                ->on('hris.karyawan')
-                ->cascadeOnUpdate()
-                ->cascadeOnDelete();
         });
 
         Schema::create('tindakaudit.temuan', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedBigInteger('created_by')->index();
+            $table->string('created_by', 15)->index();
             $table->text('temuan');
             $table->string('kode_unit', 10)->index();
             $table->string('status')->default('Draft')->index();
@@ -116,29 +33,10 @@ return new class extends Migration
             $table->string('kode_bagian')->nullable()->index();
             $table->string('kode_subbagian')->nullable()->index();
 
-            $table->foreign('created_by')
-                ->references('id')
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign('kode_unit')
-                ->references('kode_unit')
-                ->on('hris.unit_usaha')
-                ->cascadeOnUpdate()
-                ->restrictOnDelete();
             $table->foreign('bidang_id')
                 ->references('id')
                 ->on('tindakaudit.bidang')
                 ->restrictOnDelete();
-            $table->foreign('kode_bagian')
-                ->references('code')
-                ->on('hris.bagian')
-                ->cascadeOnUpdate()
-                ->nullOnDelete();
-            $table->foreign('kode_subbagian')
-                ->references('code')
-                ->on('hris.sub_bagian')
-                ->cascadeOnUpdate()
-                ->nullOnDelete();
         });
 
         Schema::create('tindakaudit.temuan_history', function (Blueprint $table) {
@@ -147,7 +45,7 @@ return new class extends Migration
             $table->text('temuan');
             $table->string('status')->index();
             $table->timestamps();
-            $table->unsignedBigInteger('changed_by')->index();
+            $table->string('changed_by', 15)->nullable()->index();
             $table->string('kode_unit', 10)->index();
             $table->unsignedInteger('bidang_id')->index();
             $table->string('kode_bagian')->nullable()->index();
@@ -158,24 +56,10 @@ return new class extends Migration
                 ->references('id')
                 ->on('tindakaudit.temuan')
                 ->cascadeOnDelete();
-            $table->foreign('changed_by')
-                ->references('id')
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign('kode_unit')
-                ->references('kode_unit')
-                ->on('hris.unit_usaha')
-                ->cascadeOnUpdate()
-                ->restrictOnDelete();
             $table->foreign('bidang_id')
                 ->references('id')
                 ->on('tindakaudit.bidang')
                 ->restrictOnDelete();
-            $table->foreign('kode_bagian')
-                ->references('code')
-                ->on('hris.bagian')
-                ->cascadeOnUpdate()
-                ->nullOnDelete();
         });
 
         Schema::create('tindakaudit.rekomendasi', function (Blueprint $table) {
@@ -225,16 +109,6 @@ return new class extends Migration
             $table->boolean('read')->default(false)->index();
             $table->string('message');
 
-            $table->foreign('kode_unit')
-                ->references('kode_unit')
-                ->on('hris.unit_usaha')
-                ->cascadeOnUpdate()
-                ->restrictOnDelete();
-            $table->foreign('kode_bagian')
-                ->references('code')
-                ->on('hris.bagian')
-                ->cascadeOnUpdate()
-                ->nullOnDelete();
             $table->foreign('temuan_id')
                 ->references('id')
                 ->on('tindakaudit.temuan')
@@ -251,12 +125,6 @@ return new class extends Migration
         Schema::dropIfExists('tindakaudit.temuan');
         Schema::dropIfExists('tindakaudit.spi');
         Schema::dropIfExists('tindakaudit.bidang');
-        Schema::dropIfExists('hris.holiday');
-        Schema::dropIfExists('hris.karyawan');
-        Schema::dropIfExists('hris.sub_bagian');
-        Schema::dropIfExists('hris.bagian');
-        Schema::dropIfExists('hris.unit_usaha');
         DB::statement('DROP SCHEMA IF EXISTS tindakaudit');
-        DB::statement('DROP SCHEMA IF EXISTS hris');
     }
 };

@@ -6,18 +6,22 @@ Format mengikuti prinsip Keep a Changelog secara ringkas.
 
 ### Added
 
-- Migration domain untuk schema `hris` dan `tindakaudit`.
-- Seeder demo untuk akun SPI, unit usaha, bagian, bidang, temuan, rekomendasi, history, dan notifikasi.
-- Konfigurasi `DB_SEARCH_PATH` untuk Postgres multi-schema (`tindakaudit,hris,public`).
+- Migration domain untuk schema `tindakaudit`.
+- Seeder demo untuk akun SPI, unit usaha, bagian, bidang, temuan, rekomendasi, history, notifikasi, dan akses `user_access`.
+- Konfigurasi `superapps` connection untuk auth, access gate, dan HRIS shared database.
+- Konfigurasi `DB_SEARCH_PATH` untuk Postgres multi-schema (`public,tindakaudit`).
 - Konfigurasi Wablas berbasis env dengan driver `log`, `disabled`, dan `wablas`.
 - Route auth untuk download bukti tindak lanjut dari storage private.
+- Command `php artisan app:install` untuk fresh-clone bootstrap yang idempotent.
+- Bootstrap SQL minimal `database/sql/superapps_bootstrap.sql` untuk schema HRIS/auth superapps tanpa data asli.
+- Workflow CI `fresh-install` untuk verifikasi install dari nol.
 - Dokumentasi portfolio di README dan retrospective.
 
 ### Changed
 
-- Login dan seed user diselaraskan dengan kolom `nik`.
-- Schema user diselaraskan dengan SQL asli: tanpa `name`, `email`, dan `email_verified_at`.
-- Field audit `created_by` dan `changed_by` disimpan sebagai `users.id`.
+- Login dan seed user dipindahkan ke `superapps_dev.public.users`.
+- Schema user tidak lagi dibuat di database TindakAudit.
+- Field audit `created_by` dan `changed_by` disimpan sebagai NIK string.
 - Endpoint utama sekarang memakai identitas user login, bukan `nik`/role dari request body.
 - Operasi multi-tabel utama memakai database transaction.
 - Upload bukti divalidasi di backend.

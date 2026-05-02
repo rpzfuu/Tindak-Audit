@@ -5,13 +5,14 @@ namespace App\Models\TindakAudit;
 use App\Models\HRIS\Bagian;
 use App\Models\HRIS\Karyawan;
 use App\Models\HRIS\UnitUsaha;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class TemuanHistory extends Model
 {
     use HasFactory;
+
+    protected $connection = 'pgsql';
 
     protected $table = 'tindakaudit.temuan_history';
 
@@ -46,7 +47,7 @@ class TemuanHistory extends Model
 
     public function karyawan()
     {
-        return $this->hasOneThrough(Karyawan::class, User::class, 'id', 'nik', 'changed_by', 'nik');
+        return $this->hasOne(Karyawan::class, 'nik', 'changed_by');
     }
 
     public function unit_usaha()

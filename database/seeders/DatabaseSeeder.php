@@ -8,7 +8,6 @@ use App\Models\TindakAudit\Rekomendasi;
 use App\Models\TindakAudit\RekomendasiHistory;
 use App\Models\TindakAudit\Temuan;
 use App\Models\TindakAudit\TemuanHistory;
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -18,8 +17,181 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::transaction(function () {
-            $now = now();
+        $now = now();
+
+        $this->seedSuperapps($now);
+
+        DB::transaction(function () use ($now) {
+            foreach (['19990001', '19990002'] as $nikSpi) {
+                DB::table('tindakaudit.spi')->updateOrInsert(
+                    ['nik' => $nikSpi],
+                    ['nik' => $nikSpi],
+                );
+            }
+
+            foreach (['Operasional', 'Keuangan', 'SDM', 'Pengadaan', 'Tanaman'] as $namaBidang) {
+                Bidang::updateOrCreate(['nama' => $namaBidang], ['updated_at' => $now]);
+            }
+
+            Storage::disk('local')->put(
+                'uploads/demo-bukti.pdf',
+                "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n",
+            );
+
+            $operasional = Bidang::where('nama', 'Operasional')->firstOrFail();
+            $keuangan = Bidang::where('nama', 'Keuangan')->firstOrFail();
+            $sdm = Bidang::where('nama', 'SDM')->firstOrFail();
+            $tanaman = Bidang::where('nama', 'Tanaman')->firstOrFail();
+
+            $draftTemuan = Temuan::updateOrCreate(
+                ['temuan' => 'Dokumen monitoring persediaan belum diperbarui secara berkala'],
+                [
+                    'created_by' => '19990001',
+                    'kode_unit' => '4U01',
+                    'bidang_id' => $operasional->id,
+                    'kode_bagian' => null,
+                    'kode_subbagian' => null,
+                    'status' => 'Draft',
+                ],
+            );
+            $this->syncTemuanHistory($draftTemuan, '19990001', 'Temuan Baru Dibuat', 'create');
+            $this->syncRekomendasi($draftTemuan, [
+                'Memperbarui dokumen monitoring persediaan setiap akhir bulan.',
+            ]);
+
+            $openTemuan = Temuan::updateOrCreate(
+                ['temuan' => 'Rekonsiliasi biaya pemeliharaan belum memiliki lampiran lengkap'],
+                [
+                    'created_by' => '19990001',
+                    'kode_unit' => '4U01',
+                    'bidang_id' => $keuangan->id,
+                    'kode_bagian' => null,
+                    'kode_subbagian' => null,
+                    'status' => 'Terbuka',
+                ],
+            );
+            $this->syncTemuanHistory($openTemuan, '19990001', 'Temuan Dikirim', 'send');
+            $this->syncRekomendasi($openTemuan, [
+                'Melengkapi lampiran rekonsiliasi biaya pemeliharaan pada periode berjalan.',
+                'Menetapkan PIC verifikasi dokumen sebelum tutup buku.',
+            ]);
+
+            $processedTemuan = Temuan::updateOrCreate(
+                ['temuan' => 'Kalibrasi alat ukur produksi belum terdokumentasi lengkap'],
+                [
+                    'created_by' => '19990002',
+                    'kode_unit' => '4U02',
+                    'bidang_id' => $operasional->id,
+                    'kode_bagian' => null,
+                    'kode_subbagian' => null,
+                    'status' => 'Sedang Diproses',
+                ],
+            );
+            $this->syncTemuanHistory($processedTemuan, '19990002', 'Temuan Dikirim', 'send');
+            $this->syncTemuanHistory($processedTemuan, '19990004', 'Temuan Diproses', 'process');
+            $this->syncRekomendasi($processedTemuan, [
+                'Melakukan kalibrasi ulang dan mengunggah berita acara pemeriksaan alat.',
+            ]);
+
+            $waitingValidationTemuan = Temuan::updateOrCreate(
+                ['temuan' => 'SOP pengarsipan bukti pembayaran belum dipatuhi seluruh bagian'],
+                [
+                    'created_by' => '19990001',
+                    'kode_unit' => '4R00',
+                    'bidang_id' => $sdm->id,
+                    'kode_bagian' => '4SDM',
+                    'kode_subbagian' => '4SDM-PRS',
+                    'status' => 'Menunggu Validasi',
+                ],
+            );
+            $waitingHistory = $this->syncTemuanHistory($waitingValidationTemuan, '19990007', 'Input Tindak Lanjut', 'tindaklanjut');
+            $this->syncRekomendasi($waitingValidationTemuan, [
+                'Melakukan sosialisasi ulang SOP pengarsipan bukti pembayaran.',
+            ], [
+                'Sosialisasi ulang telah dilakukan dan daftar hadir sudah diunggah.',
+            ], 'uploads/demo-bukti.pdf');
+
+            foreach ($waitingValidationTemuan->rekomendasi as $rekomendasi) {
+                RekomendasiHistory::updateOrCreate(
+                    [
+                        'temuan_history_id' => $waitingHistory->id,
+                        'rekomendasi_id' => $rekomendasi->id,
+                    ],
+                    [
+                        'rekomendasi' => $rekomendasi->rekomendasi,
+                        'status' => $rekomendasi->status,
+                        'tindak_lanjut' => $rekomendasi->tindak_lanjut,
+                        'action' => 'tindaklanjut',
+                    ],
+                );
+            }
+
+            $finishedTemuan = Temuan::updateOrCreate(
+                ['temuan' => 'Kartu inspeksi kebun belum ditandatangani supervisor'],
+                [
+                    'created_by' => '19990002',
+                    'kode_unit' => '4R00',
+                    'bidang_id' => $tanaman->id,
+                    'kode_bagian' => '4TAN',
+                    'kode_subbagian' => '4TAN-BDY',
+                    'status' => 'Selesai',
+                ],
+            );
+            $this->syncTemuanHistory($finishedTemuan, '19990002', 'Temuan Dikirim', 'send');
+            $this->syncTemuanHistory($finishedTemuan, '19990005', 'Input Tindak Lanjut', 'tindaklanjut', 'Menunggu Validasi');
+            $this->syncTemuanHistory($finishedTemuan, '19990001', 'Temuan Divalidasi', 'validation', 'Divalidasi');
+            $this->syncTemuanHistory($finishedTemuan, '19990005', 'Audit Selesai', 'checked');
+            $this->syncRekomendasi($finishedTemuan, [
+                'Melengkapi tanda tangan supervisor pada kartu inspeksi berjalan.',
+            ], [
+                'Supervisor sudah menandatangani kartu inspeksi dan bukti sudah diunggah.',
+            ], 'uploads/demo-bukti.pdf', 'Sesuai', 'Bukti sesuai dengan rekomendasi.');
+
+            foreach ([
+                [
+                    'temuan_id' => $waitingValidationTemuan->id,
+                    'kode_unit' => '4R00',
+                    'kode_bagian' => '4SPI',
+                    'action' => 'tindaklanjut',
+                    'message' => 'Temuan Ditindaklanjut',
+                ],
+                [
+                    'temuan_id' => $openTemuan->id,
+                    'kode_unit' => '4U01',
+                    'kode_bagian' => null,
+                    'action' => 'send',
+                    'message' => 'Ada Temuan Baru Di Unit Anda',
+                ],
+                [
+                    'temuan_id' => $finishedTemuan->id,
+                    'kode_unit' => '4R00',
+                    'kode_bagian' => '4TAN',
+                    'action' => 'validation',
+                    'message' => 'Temuan Divalidasi',
+                ],
+            ] as $notifikasi) {
+                Notifikasi::updateOrCreate(
+                    [
+                        'temuan_id' => $notifikasi['temuan_id'],
+                        'kode_unit' => $notifikasi['kode_unit'],
+                        'kode_bagian' => $notifikasi['kode_bagian'],
+                        'action' => $notifikasi['action'],
+                    ],
+                    [
+                        'message' => $notifikasi['message'],
+                        'read' => false,
+                    ],
+                );
+            }
+        });
+    }
+
+    private function seedSuperapps($now): void
+    {
+        $sa = DB::connection('superapps');
+
+        $sa->transaction(function () use ($sa, $now) {
+            $this->syncSuperappsSequences($sa);
 
             foreach ([
                 [
@@ -44,12 +216,11 @@ class DatabaseSeeder extends Seeder
                     'is_head_office' => false,
                 ],
             ] as $unit) {
-                DB::table('hris.unit_usaha')->updateOrInsert(
+                $sa->table('hris.unit_usaha')->updateOrInsert(
                     ['kode_unit' => $unit['kode_unit']],
                     [
                         ...$unit,
                         'is_saturday_on' => false,
-                        'is_active' => true,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ],
@@ -67,7 +238,7 @@ class DatabaseSeeder extends Seeder
                 ['kode_unit' => '4U01', 'name' => 'AFDELING I', 'code' => '4U01-AFD1'],
                 ['kode_unit' => '4U02', 'name' => 'PENGOLAHAN', 'code' => '4U02-PGL'],
             ] as $bagian) {
-                DB::table('hris.bagian')->updateOrInsert(
+                $sa->table('hris.bagian')->updateOrInsert(
                     ['code' => $bagian['code']],
                     [
                         ...$bagian,
@@ -84,7 +255,7 @@ class DatabaseSeeder extends Seeder
                 ['bagian_code' => '4U01-AFD1', 'name' => 'Blok A', 'code' => '4U01-AFD1-A'],
                 ['bagian_code' => '4U02-PGL', 'name' => 'Stasiun Pengolahan', 'code' => '4U02-PGL-A'],
             ] as $subBagian) {
-                DB::table('hris.sub_bagian')->updateOrInsert(
+                $sa->table('hris.sub_bagian')->updateOrInsert(
                     ['code' => $subBagian['code']],
                     [
                         ...$subBagian,
@@ -169,10 +340,8 @@ class DatabaseSeeder extends Seeder
                 ],
             ];
 
-            $usersByNik = [];
-
             foreach ($karyawans as $karyawan) {
-                DB::table('hris.karyawan')->updateOrInsert(
+                $sa->table('hris.karyawan')->updateOrInsert(
                     ['nik' => $karyawan['nik']],
                     [
                         ...$karyawan,
@@ -191,28 +360,28 @@ class DatabaseSeeder extends Seeder
                     ],
                 );
 
-                $usersByNik[$karyawan['nik']] = User::updateOrCreate(
+                $sa->table('public.users')->updateOrInsert(
                     ['nik' => $karyawan['nik']],
                     [
                         'password' => Hash::make('password'),
-                        'is_reset_password' => false,
-                        'reset_password_at' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ],
                 );
+
+                $this->grantAppAccess($sa, $karyawan['nik'], $now);
             }
 
-            foreach (['19990001', '19990002'] as $nikSpi) {
-                DB::table('tindakaudit.spi')->updateOrInsert(
-                    ['nik' => $nikSpi],
-                    ['nik' => $nikSpi],
-                );
+            foreach (config('tindakaudit.real_access_niks', []) as $nik) {
+                $hasKaryawan = $sa->table('hris.karyawan')->where('nik', $nik)->exists();
+                $hasUser = $sa->table('public.users')->where('nik', $nik)->exists();
+
+                if ($hasKaryawan && $hasUser) {
+                    $this->grantAppAccess($sa, $nik, $now);
+                }
             }
 
-            foreach (['Operasional', 'Keuangan', 'SDM', 'Pengadaan', 'Tanaman'] as $namaBidang) {
-                Bidang::updateOrCreate(['nama' => $namaBidang], ['updated_at' => $now]);
-            }
-
-            DB::table('hris.holiday')->updateOrInsert(
+            $sa->table('hris.holiday')->updateOrInsert(
                 ['date' => '2026-01-01'],
                 [
                     'name' => 'Tahun Baru',
@@ -221,161 +390,41 @@ class DatabaseSeeder extends Seeder
                     'updated_at' => $now,
                 ],
             );
-
-            Storage::disk('local')->put(
-                'uploads/demo-bukti.pdf',
-                "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n",
-            );
-
-            $operasional = Bidang::where('nama', 'Operasional')->firstOrFail();
-            $keuangan = Bidang::where('nama', 'Keuangan')->firstOrFail();
-            $sdm = Bidang::where('nama', 'SDM')->firstOrFail();
-            $tanaman = Bidang::where('nama', 'Tanaman')->firstOrFail();
-
-            $draftTemuan = Temuan::updateOrCreate(
-                ['temuan' => 'Dokumen monitoring persediaan belum diperbarui secara berkala'],
-                [
-                    'created_by' => $usersByNik['19990001']->id,
-                    'kode_unit' => '4U01',
-                    'bidang_id' => $operasional->id,
-                    'kode_bagian' => null,
-                    'kode_subbagian' => null,
-                    'status' => 'Draft',
-                ],
-            );
-            $this->syncTemuanHistory($draftTemuan, $usersByNik['19990001']->id, 'Temuan Baru Dibuat', 'create');
-            $this->syncRekomendasi($draftTemuan, [
-                'Memperbarui dokumen monitoring persediaan setiap akhir bulan.',
-            ]);
-
-            $openTemuan = Temuan::updateOrCreate(
-                ['temuan' => 'Rekonsiliasi biaya pemeliharaan belum memiliki lampiran lengkap'],
-                [
-                    'created_by' => $usersByNik['19990001']->id,
-                    'kode_unit' => '4U01',
-                    'bidang_id' => $keuangan->id,
-                    'kode_bagian' => null,
-                    'kode_subbagian' => null,
-                    'status' => 'Terbuka',
-                ],
-            );
-            $this->syncTemuanHistory($openTemuan, $usersByNik['19990001']->id, 'Temuan Dikirim', 'send');
-            $this->syncRekomendasi($openTemuan, [
-                'Melengkapi lampiran rekonsiliasi biaya pemeliharaan pada periode berjalan.',
-                'Menetapkan PIC verifikasi dokumen sebelum tutup buku.',
-            ]);
-
-            $processedTemuan = Temuan::updateOrCreate(
-                ['temuan' => 'Kalibrasi alat ukur produksi belum terdokumentasi lengkap'],
-                [
-                    'created_by' => $usersByNik['19990002']->id,
-                    'kode_unit' => '4U02',
-                    'bidang_id' => $operasional->id,
-                    'kode_bagian' => null,
-                    'kode_subbagian' => null,
-                    'status' => 'Sedang Diproses',
-                ],
-            );
-            $this->syncTemuanHistory($processedTemuan, $usersByNik['19990002']->id, 'Temuan Dikirim', 'send');
-            $this->syncTemuanHistory($processedTemuan, $usersByNik['19990004']->id, 'Temuan Diproses', 'process');
-            $this->syncRekomendasi($processedTemuan, [
-                'Melakukan kalibrasi ulang dan mengunggah berita acara pemeriksaan alat.',
-            ]);
-
-            $waitingValidationTemuan = Temuan::updateOrCreate(
-                ['temuan' => 'SOP pengarsipan bukti pembayaran belum dipatuhi seluruh bagian'],
-                [
-                    'created_by' => $usersByNik['19990001']->id,
-                    'kode_unit' => '4R00',
-                    'bidang_id' => $sdm->id,
-                    'kode_bagian' => '4SDM',
-                    'kode_subbagian' => '4SDM-PRS',
-                    'status' => 'Menunggu Validasi',
-                ],
-            );
-            $waitingHistory = $this->syncTemuanHistory($waitingValidationTemuan, $usersByNik['19990007']->id, 'Input Tindak Lanjut', 'tindaklanjut');
-            $this->syncRekomendasi($waitingValidationTemuan, [
-                'Melakukan sosialisasi ulang SOP pengarsipan bukti pembayaran.',
-            ], [
-                'Sosialisasi ulang telah dilakukan dan daftar hadir sudah diunggah.',
-            ], 'uploads/demo-bukti.pdf');
-
-            foreach ($waitingValidationTemuan->rekomendasi as $rekomendasi) {
-                RekomendasiHistory::updateOrCreate(
-                    [
-                        'temuan_history_id' => $waitingHistory->id,
-                        'rekomendasi_id' => $rekomendasi->id,
-                    ],
-                    [
-                        'rekomendasi' => $rekomendasi->rekomendasi,
-                        'status' => $rekomendasi->status,
-                        'tindak_lanjut' => $rekomendasi->tindak_lanjut,
-                        'action' => 'tindaklanjut',
-                    ],
-                );
-            }
-
-            $finishedTemuan = Temuan::updateOrCreate(
-                ['temuan' => 'Kartu inspeksi kebun belum ditandatangani supervisor'],
-                [
-                    'created_by' => $usersByNik['19990002']->id,
-                    'kode_unit' => '4R00',
-                    'bidang_id' => $tanaman->id,
-                    'kode_bagian' => '4TAN',
-                    'kode_subbagian' => '4TAN-BDY',
-                    'status' => 'Selesai',
-                ],
-            );
-            $this->syncTemuanHistory($finishedTemuan, $usersByNik['19990002']->id, 'Temuan Dikirim', 'send');
-            $this->syncTemuanHistory($finishedTemuan, $usersByNik['19990005']->id, 'Input Tindak Lanjut', 'tindaklanjut', 'Menunggu Validasi');
-            $this->syncTemuanHistory($finishedTemuan, $usersByNik['19990001']->id, 'Temuan Divalidasi', 'validation', 'Divalidasi');
-            $this->syncTemuanHistory($finishedTemuan, $usersByNik['19990005']->id, 'Audit Selesai', 'checked');
-            $this->syncRekomendasi($finishedTemuan, [
-                'Melengkapi tanda tangan supervisor pada kartu inspeksi berjalan.',
-            ], [
-                'Supervisor sudah menandatangani kartu inspeksi dan bukti sudah diunggah.',
-            ], 'uploads/demo-bukti.pdf', 'Sesuai', 'Bukti sesuai dengan rekomendasi.');
-
-            foreach ([
-                [
-                    'temuan_id' => $waitingValidationTemuan->id,
-                    'kode_unit' => '4R00',
-                    'kode_bagian' => '4SPI',
-                    'action' => 'tindaklanjut',
-                    'message' => 'Temuan Ditindaklanjut',
-                ],
-                [
-                    'temuan_id' => $openTemuan->id,
-                    'kode_unit' => '4U01',
-                    'kode_bagian' => null,
-                    'action' => 'send',
-                    'message' => 'Ada Temuan Baru Di Unit Anda',
-                ],
-                [
-                    'temuan_id' => $finishedTemuan->id,
-                    'kode_unit' => '4R00',
-                    'kode_bagian' => '4TAN',
-                    'action' => 'validation',
-                    'message' => 'Temuan Divalidasi',
-                ],
-            ] as $notifikasi) {
-                Notifikasi::updateOrCreate(
-                    [
-                        'temuan_id' => $notifikasi['temuan_id'],
-                        'kode_unit' => $notifikasi['kode_unit'],
-                        'kode_bagian' => $notifikasi['kode_bagian'],
-                        'action' => $notifikasi['action'],
-                    ],
-                    [
-                        'message' => $notifikasi['message'],
-                        'read' => false,
-                    ],
-                );
-            }
         });
     }
 
-    private function syncTemuanHistory(Temuan $temuan, int $userId, string $keterangan, string $action, ?string $status = null): TemuanHistory
+    private function syncSuperappsSequences($connection): void
+    {
+        foreach ([
+            ['hris.unit_usaha', 'id', 'hris.unit_usaha_id_seq'],
+            ['hris.bagian', 'id', 'hris.bagian_id_seq'],
+            ['hris.sub_bagian', 'id', 'hris.sub_bagian_id_seq'],
+            ['hris.karyawan', 'id', 'hris.karyawan_id_seq'],
+            ['hris.holiday', 'id', 'hris.holiday_id_seq'],
+            ['public.users', 'id', 'public.users_id_seq'],
+            ['public.user_access', 'id', 'public.user_access_id_seq'],
+        ] as [$table, $column, $sequence]) {
+            $connection->statement(
+                "SELECT setval('{$sequence}', COALESCE((SELECT MAX({$column}) FROM {$table}), 0) + 1, false)",
+            );
+        }
+    }
+
+    private function grantAppAccess($connection, string $nik, $now): void
+    {
+        $connection->table('public.user_access')->updateOrInsert(
+            [
+                'nik' => $nik,
+                'aplikasi' => config('tindakaudit.app_code'),
+            ],
+            [
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        );
+    }
+
+    private function syncTemuanHistory(Temuan $temuan, string $nik, string $keterangan, string $action, ?string $status = null): TemuanHistory
     {
         return TemuanHistory::updateOrCreate(
             [
@@ -388,7 +437,7 @@ class DatabaseSeeder extends Seeder
                 'bidang_id' => $temuan->bidang_id,
                 'kode_bagian' => $temuan->kode_bagian,
                 'status' => $status ?? $temuan->status,
-                'changed_by' => $userId,
+                'changed_by' => $nik,
                 'keterangan' => $keterangan,
             ],
         );

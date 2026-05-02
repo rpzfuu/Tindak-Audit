@@ -3,13 +3,14 @@
 namespace App\Models\HRIS;
 
 use App\Models\User;
-use App\Models\HRIS\UnitUsaha;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Karyawan extends Model
 {
     use HasFactory;
+
+    protected $connection = 'superapps';
 
     protected $table = 'hris.karyawan';
 
@@ -22,5 +23,4 @@ class Karyawan extends Model
     {
         return $this->hasOne(User::class, 'nik', 'nik');
     }
-
 }

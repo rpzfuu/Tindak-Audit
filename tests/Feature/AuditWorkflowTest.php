@@ -54,7 +54,7 @@ test('spi and unit users can complete the audit workflow', function () {
         ->firstOrFail();
     $rekomendasi = $temuan->rekomendasi->first();
 
-    expect($temuan->created_by)->toBe($spi->id);
+    expect($temuan->created_by)->toBe($spi->nik);
 
     $this->postJson('/api/kirimtemuan', [
         'temuan_id' => $temuan->id,

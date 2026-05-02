@@ -24,6 +24,11 @@
         <env name="CACHE_STORE" value="array"/>
         <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
         <!-- <env name="DB_DATABASE" value=":memory:"/> -->
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_DATABASE" value="TindakAudit_test"/>
+        <env name="DB_SEARCH_PATH" value="public,tindakaudit"/>
+        <env name="SUPERAPPS_DB_DATABASE" value="superapps_dev_test"/>
+        <env name="SUPERAPPS_DB_SEARCH_PATH" value="public,hris"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

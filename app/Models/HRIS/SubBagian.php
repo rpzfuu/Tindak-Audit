@@ -9,6 +9,8 @@ class SubBagian extends Model
 {
     use HasFactory;
 
+    protected $connection = 'superapps';
+
     protected $table = 'hris.sub_bagian';
 
     public function bagian()

@@ -1,0 +1,106 @@
+name: Fresh Install
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fresh-install:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_SEARCH_PATH: public,tindakaudit
+      SUPERAPPS_DB_HOST: 127.0.0.1
+      SUPERAPPS_DB_PORT: 5432
+      SUPERAPPS_DB_USERNAME: postgres
+      SUPERAPPS_DB_PASSWORD: postgres
+      SUPERAPPS_DB_SEARCH_PATH: public,hris
+      WABLAS_DRIVER: disabled
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_pgsql, mbstring, openssl
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install frontend dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Create databases
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres TindakAudit
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres superapps_dev
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres TindakAudit_test
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres superapps_dev_test
+
+      - name: Bootstrap application databases
+        run: php artisan app:install --force
+        env:
+          DB_DATABASE: TindakAudit
+          SUPERAPPS_DB_DATABASE: superapps_dev
+
+      - name: Bootstrap test databases
+        run: php artisan app:install --force
+        env:
+          APP_ENV: testing
+          CACHE_STORE: array
+          QUEUE_CONNECTION: sync
+          SESSION_DRIVER: array
+          DB_DATABASE: TindakAudit_test
+          SUPERAPPS_DB_DATABASE: superapps_dev_test
+
+      - name: Run tests
+        run: php artisan test
+
+      - name: Smoke login page
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > storage/logs/serve.log 2>&1 &
+          sleep 3
+          curl -fsS -c cookies.txt http://127.0.0.1:8000/login > /tmp/login.html
+          token=$(php -r '$lines = file("cookies.txt"); foreach ($lines as $line) { if (str_contains($line, "XSRF-TOKEN")) { $parts = preg_split("/\s+/", trim($line)); echo urldecode(end($parts)); }}')
+          status=$(curl -sS -o /tmp/login-post.html -w "%{http_code}" -b cookies.txt -c cookies.txt -H "X-XSRF-TOKEN: ${token}" -H "X-Requested-With: XMLHttpRequest" -d "nik=19990001&password=password" http://127.0.0.1:8000/login)
+          test "$status" = "302"
+        env:
+          DB_DATABASE: TindakAudit
+          SUPERAPPS_DB_DATABASE: superapps_dev
